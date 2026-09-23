@@ -134,6 +134,28 @@
         .pulse-border { animation: pulseBorder 2s infinite; }
         @keyframes pulseBorder { 0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); } }
 
+        /* Estilos da Lousa Mágica */
+        .canvas-toolbar-btn {
+            width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+            border-radius: 8px; background: rgba(30, 41, 59, 0.8); border: 1px solid var(--card-border);
+            color: var(--text-muted); transition: all 0.2s; cursor: pointer;
+        }
+        .canvas-toolbar-btn.active, .canvas-toolbar-btn:hover {
+            background: rgba(139, 92, 246, 0.2); border-color: var(--accent); color: white;
+        }
+        .color-history-swatch {
+            width: 24px; height: 24px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);
+            cursor: pointer; transition: transform 0.1s;
+        }
+        .color-history-swatch:hover { transform: scale(1.1); }
+        
+        #magic-canvas-container {
+            width: 100%; height: 60vh; background-color: #ffffff; border-radius: 12px;
+            overflow: hidden; position: relative; border: 2px solid var(--card-border);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.1); cursor: crosshair; touch-action: none;
+        }
+        #magic-canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+
     </style>
 </head>
 <body class="flex flex-col">
@@ -298,40 +320,130 @@
         <!-- ========================================== -->
         <!-- ABA 2: TRANSFERÊNCIA DE ARQUIVOS (NUVEM)   -->
         <!-- ========================================== -->
-        <section id="tab-transfer" class="hidden animate-fade-in grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+        <section id="tab-transfer" class="hidden animate-fade-in flex flex-col gap-6 max-w-7xl mx-auto w-full">
             
-            <!-- Caixa de Envio -->
-            <div class="glass-panel p-8 flex flex-col gap-4">
-                <div>
-                    <h2 class="text-xl font-bold flex items-center gap-2"><span class="text-2xl">📤</span> Enviar Arquivo</h2>
-                    <p class="text-sm text-slate-400 mt-1">Envie o ZIP gerado ou qualquer outro arquivo para resgatar no celular.</p>
-                </div>
-
-                <input type="file" id="transfer-file-input" class="transfer-input file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 cursor-pointer">
-                
-                <div id="sender-preview" class="hidden p-4 bg-slate-900/50 rounded-xl border border-slate-700 text-center text-sm"></div>
-                
-                <button id="btn-upload-transfer" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all">
-                    Fazer Upload
-                </button>
-
-                <div id="upload-result" class="mt-2 text-center text-sm"></div>
+            <!-- Seletor de Modo de Transferência -->
+            <div class="flex justify-center gap-2 sm:gap-4 mb-2 overflow-x-auto pb-2">
+                <button class="transf-tab-btn active glass-panel px-4 sm:px-6 py-2 rounded-full font-bold text-xs sm:text-sm whitespace-nowrap text-white border-purple-500 bg-purple-900/20" data-mode="file">📁 Arquivos</button>
+                <button class="transf-tab-btn glass-panel px-4 sm:px-6 py-2 rounded-full font-bold text-xs sm:text-sm whitespace-nowrap text-slate-400 border-transparent hover:border-slate-600" data-mode="text">📝 Texto / Código</button>
+                <button class="transf-tab-btn glass-panel px-4 sm:px-6 py-2 rounded-full font-bold text-xs sm:text-sm whitespace-nowrap text-slate-400 border-transparent hover:border-slate-600" data-mode="canvas">🎨 Lousa Mágica</button>
             </div>
 
-            <!-- Caixa de Recebimento -->
-            <div class="glass-panel p-8 flex flex-col gap-4">
-                <div>
-                    <h2 class="text-xl font-bold flex items-center gap-2"><span class="text-2xl">📥</span> Receber Arquivo</h2>
-                    <p class="text-sm text-slate-400 mt-1">Digite o código de 8 dígitos para baixar o arquivo no seu dispositivo.</p>
+            <!-- MODO: ARQUIVOS -->
+            <div id="transf-mode-file" class="transf-mode-section grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl mx-auto">
+                <!-- Caixa de Envio -->
+                <div class="glass-panel p-8 flex flex-col gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold flex items-center gap-2"><span class="text-2xl">📤</span> Enviar Arquivo</h2>
+                        <p class="text-sm text-slate-400 mt-1">Envie o ZIP gerado ou qualquer outro arquivo para resgatar no celular.</p>
+                    </div>
+
+                    <input type="file" id="transfer-file-input" class="transfer-input file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 cursor-pointer">
+                    
+                    <div id="sender-preview" class="hidden p-4 bg-slate-900/50 rounded-xl border border-slate-700 text-center text-sm"></div>
+                    
+                    <button id="btn-upload-transfer" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all">
+                        Fazer Upload
+                    </button>
+
+                    <div id="upload-result" class="mt-2 text-center text-sm"></div>
                 </div>
 
-                <input type="text" id="transfer-code-input" maxlength="8" placeholder="CÓDIGO" class="transfer-input transfer-input-code uppercase">
-                
-                <button id="btn-download-transfer" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all">
-                    Buscar e Baixar
-                </button>
+                <!-- Caixa de Recebimento Global -->
+                <div class="glass-panel p-8 flex flex-col gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold flex items-center gap-2"><span class="text-2xl">📥</span> Receber da Nuvem</h2>
+                        <p class="text-sm text-slate-400 mt-1">Digite o código de 8 dígitos. Válido para arquivos, textos ou desenhos.</p>
+                    </div>
 
-                <div id="download-result" class="mt-2 text-center text-sm"></div>
+                    <input type="text" id="transfer-code-input" maxlength="8" placeholder="CÓDIGO" class="transfer-input transfer-input-code uppercase">
+                    
+                    <button id="btn-download-transfer" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all">
+                        Buscar na Nuvem
+                    </button>
+
+                    <div id="download-result" class="mt-2 text-center text-sm"></div>
+                </div>
+            </div>
+
+            <!-- MODO: TEXTO / CÓDIGO -->
+            <div id="transf-mode-text" class="transf-mode-section hidden grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl mx-auto">
+                <div class="glass-panel p-6 flex flex-col gap-4">
+                    <h2 class="text-lg font-bold">📤 Enviar Texto / Código</h2>
+                    <textarea id="transfer-text-input" class="w-full h-64 bg-slate-900 border border-slate-600 rounded-xl p-4 text-sm font-mono focus:ring-2 focus:ring-purple-500 outline-none resize-none" placeholder="Cole seu script JS, logs ou textos aqui..."></textarea>
+                    <button id="btn-upload-text" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all">Enviar para Nuvem</button>
+                    <div id="upload-text-result" class="text-center text-sm"></div>
+                </div>
+                <div class="glass-panel p-6 flex flex-col gap-4">
+                    <h2 class="text-lg font-bold">📥 Área de Leitura</h2>
+                    <textarea id="transfer-text-output" class="w-full h-64 bg-slate-900 border border-slate-600 rounded-xl p-4 text-sm font-mono text-emerald-400 outline-none resize-none" readonly placeholder="O texto recebido aparecerá aqui..."></textarea>
+                    <button id="btn-copy-text" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all">Copiar Texto</button>
+                </div>
+            </div>
+
+            <!-- MODO: LOUSA MÁGICA -->
+            <div id="transf-mode-canvas" class="transf-mode-section hidden flex flex-col lg:flex-row gap-6 w-full max-w-6xl mx-auto">
+                
+                <!-- Ferramentas -->
+                <div class="glass-panel p-4 flex flex-row lg:flex-col gap-4 w-full lg:w-20 overflow-x-auto flex-shrink-0">
+                    <div class="flex lg:flex-col gap-2">
+                        <button class="canvas-toolbar-btn active" data-tool="brush" title="Pincel Livre">🖌️</button>
+                        <button class="canvas-toolbar-btn" data-tool="line" title="Linha">📏</button>
+                        <button class="canvas-toolbar-btn" data-tool="rect" title="Retângulo">⬜</button>
+                        <button class="canvas-toolbar-btn" data-tool="circle" title="Círculo">⭕</button>
+                        <button class="canvas-toolbar-btn" data-tool="star" title="Estrela">⭐</button>
+                        <button class="canvas-toolbar-btn" data-tool="heart" title="Coração">❤️</button>
+                    </div>
+                    
+                    <div class="w-px lg:w-full h-full lg:h-px bg-slate-700 my-1"></div>
+                    
+                    <div class="flex lg:flex-col gap-2 items-center">
+                        <input type="color" id="magic-color" value="#000000" class="w-8 h-8 rounded cursor-pointer border-none p-0 bg-transparent" title="Cor Principal">
+                        <input type="range" id="magic-size" min="1" max="50" value="5" class="w-24 lg:w-full accent-purple-500" title="Espessura">
+                    </div>
+
+                    <div class="w-px lg:w-full h-full lg:h-px bg-slate-700 my-1"></div>
+
+                    <div class="flex lg:flex-col gap-2">
+                        <button id="btn-magic-undo" class="canvas-toolbar-btn" title="Desfazer (Ctrl+Z)">↩️</button>
+                        <button id="btn-magic-redo" class="canvas-toolbar-btn" title="Refazer (Ctrl+Y)">↪️</button>
+                        <button id="btn-magic-clear" class="canvas-toolbar-btn text-red-400" title="Limpar Tudo">🗑️</button>
+                    </div>
+                </div>
+
+                <!-- Canvas Principal -->
+                <div class="flex-grow flex flex-col gap-3">
+                    <div class="flex justify-between items-center bg-slate-800 p-3 rounded-xl border border-slate-700">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-slate-400">Histórico de Cores:</span>
+                            <div id="color-history" class="flex gap-1"></div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="cursor-pointer bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-1.5 px-3 rounded shadow transition-all">
+                                📥 Importar JS (Auto.js)
+                                <input type="file" id="magic-import-js" class="hidden" accept=".js,.txt">
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="magic-canvas-container">
+                        <canvas id="magic-canvas" width="1080" height="1920"></canvas>
+                    </div>
+                </div>
+
+                <!-- Painel Direito (Nuvem e Camadas) -->
+                <div class="glass-panel p-4 flex flex-col gap-4 w-full lg:w-64 flex-shrink-0">
+                    <h3 class="font-bold text-sm text-center border-b border-slate-700 pb-2">☁️ Nuvem & Desenho</h3>
+                    <button id="btn-magic-send" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-3 rounded-lg shadow-lg text-sm transition-all w-full">
+                        📤 Enviar Desenho
+                    </button>
+                    <div id="magic-upload-result" class="text-center text-xs"></div>
+
+                    <h3 class="font-bold text-sm mt-4">Camadas Detectadas</h3>
+                    <div id="magic-layers-list" class="flex flex-col gap-2 overflow-y-auto max-h-48 text-xs">
+                        <div class="text-slate-500 italic">Nenhuma camada JS importada. Desenhos manuais ficam na camada base.</div>
+                    </div>
+                </div>
             </div>
 
         </section>
@@ -517,6 +629,30 @@
             }
         } catch (e) { console.warn("Supabase não pôde ser inicializado:", e); }
 
+        // --- NAVEGAÇÃO DE SUB-ABAS (TRANSFERÊNCIA) ---
+        const transfTabs = document.querySelectorAll('.transf-tab-btn');
+        const transfSections = document.querySelectorAll('.transf-mode-section');
+
+        transfTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                transfTabs.forEach(t => {
+                    t.classList.remove('text-white', 'border-purple-500', 'bg-purple-900/20');
+                    t.classList.add('text-slate-400', 'border-transparent');
+                });
+                tab.classList.remove('text-slate-400', 'border-transparent');
+                tab.classList.add('text-white', 'border-purple-500', 'bg-purple-900/20');
+
+                const mode = tab.getAttribute('data-mode');
+                transfSections.forEach(sec => sec.classList.add('hidden'));
+                document.getElementById('transf-mode-' + mode).classList.remove('hidden');
+                
+                if(mode === 'canvas') { resizeMagicCanvas(); redrawMagicCanvas(); }
+            });
+        });
+
+        // ==========================================
+        // LÓGICA DE TRANSFERÊNCIA DE ARQUIVOS (EXISTENTE MODIFICADA)
+        // ==========================================
         let selectedTransferFile = null;
 
         document.getElementById('transfer-file-input').addEventListener('change', function(e) {
@@ -598,19 +734,427 @@
                 const { data: signedData, error: signedError } = await supabaseClient.storage.from("files").createSignedUrl(data.file_path, 86400);
                 if (signedError) throw signedError;
 
+                let extraHtml = '';
+                if (data.file_type === 'text/plain' && data.file_name.endsWith('_transfer.txt')) {
+                    extraHtml = `<button onclick="carregarTextoDaNuvem('${escapeAttribute(signedData.signedUrl)}')" class="w-full mt-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition shadow-lg text-sm">📖 Abrir no Painel de Texto</button>`;
+                } else if (data.file_type === 'application/json' && data.file_name.endsWith('_canvas.json')) {
+                    extraHtml = `<button onclick="carregarLousaDaNuvem('${escapeAttribute(signedData.signedUrl)}')" class="w-full mt-2 bg-purple-700 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg transition shadow-lg text-sm">🎨 Abrir na Lousa Mágica</button>`;
+                }
+
                 resultBox.innerHTML = `
-                    <div class="mt-4 p-4 bg-slate-800 border border-slate-600 rounded-xl">
+                    <div class="mt-4 p-4 bg-slate-800 border border-slate-600 rounded-xl text-left">
                         <div class="font-bold text-lg mb-1">${escapeHtml(data.file_name)}</div>
                         <div class="text-xs text-slate-400 mb-4">${formatBytes(data.file_size)}</div>
                         <button onclick="baixarArquivo('${escapeAttribute(signedData.signedUrl)}', '${escapeAttribute(data.file_name)}')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-4 rounded-lg transition shadow-lg">
-                            ⬇️ Baixar Arquivo
+                            ⬇️ Baixar Arquivo Diretamente
                         </button>
+                        ${extraHtml}
                     </div>
                 `;
             } catch (err) {
                 resultBox.innerHTML = `<span class="text-error">${err.message}</span>`;
             }
         });
+
+        // Função genérica de upload para Supabase
+        async function uploadGenericToSupabase(blob, fileName, fileType, resultElementId) {
+            const resultBox = document.getElementById(resultElementId);
+            if (!supabaseClient) { resultBox.innerHTML = '<span class="text-error">Sem conexão com a nuvem.</span>'; return; }
+            resultBox.innerHTML = '<span class="text-info animate-pulse">Enviando para nuvem...</span>';
+
+            try {
+                const id = generateUUID();
+                const filePath = id + "/" + fileName;
+
+                const { error: uploadError } = await supabaseClient.storage.from("files").upload(filePath, blob, {
+                    contentType: fileType, upsert: false
+                });
+                if (uploadError) throw uploadError;
+
+                const codigo = id.replace(/-/g, "").substring(0, 8).toUpperCase();
+
+                const { error: dbError } = await supabaseClient.from("transfers").insert({
+                    code: codigo, file_path: filePath, file_name: fileName,
+                    file_type: fileType, file_size: blob.size
+                });
+                if (dbError) throw dbError;
+
+                resultBox.innerHTML = `
+                    <div class="mt-3 p-3 bg-emerald-900/30 border border-emerald-500/50 rounded-xl">
+                        <div class="text-emerald-400 font-bold text-sm mb-1">✓ Enviado!</div>
+                        <div class="text-xl font-black tracking-widest text-white bg-black/40 py-1 rounded cursor-pointer" onclick="navigator.clipboard.writeText('${codigo}'); showToast('Código copiado!')" title="Clique para copiar">
+                            ${codigo} 📋
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                resultBox.innerHTML = `<span class="text-error">Erro: ${err.message}</span>`;
+            }
+        }
+
+
+        // ==========================================
+        // LÓGICA DE TEXTO / CÓDIGO
+        // ==========================================
+        document.getElementById('btn-upload-text').addEventListener('click', () => {
+            const text = document.getElementById('transfer-text-input').value;
+            if (!text.trim()) { showToast('O texto está vazio!', true); return; }
+            const blob = new Blob([text], { type: 'text/plain' });
+            uploadGenericToSupabase(blob, `codigo_${Date.now()}_transfer.txt`, 'text/plain', 'upload-text-result');
+        });
+
+        document.getElementById('btn-copy-text').addEventListener('click', () => {
+            const out = document.getElementById('transfer-text-output');
+            out.select(); document.execCommand('copy');
+            showToast('Texto copiado para a área de transferência!');
+        });
+
+        async function carregarTextoDaNuvem(url) {
+            try {
+                showLoader("Carregando Texto", "Lendo da nuvem...");
+                const response = await fetch(url);
+                const text = await response.text();
+                document.getElementById('transfer-text-output').value = text;
+                document.querySelector('.transf-tab-btn[data-mode="text"]').click(); // Vai pra aba de texto
+                hideLoader();
+                showToast("Texto carregado com sucesso!");
+            } catch (e) {
+                hideLoader(); showToast("Erro ao ler o texto", true);
+            }
+        }
+
+        // ==========================================
+        // LÓGICA DA LOUSA MÁGICA & IMPORTAÇÃO DE JS
+        // ==========================================
+        const MagicCanvas = {
+            el: document.getElementById('magic-canvas'),
+            ctx: document.getElementById('magic-canvas').getContext('2d'),
+            drawings: [], // { type, color, size, points, layerId }
+            redoStack: [],
+            layersInfo: {}, // { id: { name, color, visible } }
+            tool: 'brush',
+            color: '#000000',
+            size: 5,
+            isDrawing: false,
+            currentPath: null,
+            startX: 0, startY: 0,
+            tempShape: null,
+            colorHistory: ['#000000', '#ef4444', '#3b82f6', '#10b981', '#f59e0b']
+        };
+
+        function initMagicCanvas() {
+            MagicCanvas.ctx.lineCap = 'round';
+            MagicCanvas.ctx.lineJoin = 'round';
+            updateColorHistoryUI();
+        }
+
+        function resizeMagicCanvas() {
+            // Mantém a proporção e resolução interna alta (1080x1920) mas redimensiona CSS
+            const container = document.getElementById('magic-canvas-container');
+            // A resolução interna permanece 1080x1920 para bater com o Auto.js
+        }
+
+        // --- Interações de Ferramentas ---
+        document.querySelectorAll('.canvas-toolbar-btn[data-tool]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.canvas-toolbar-btn[data-tool]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                MagicCanvas.tool = btn.getAttribute('data-tool');
+            });
+        });
+
+        const mColorInput = document.getElementById('magic-color');
+        const mSizeInput = document.getElementById('magic-size');
+        
+        mColorInput.addEventListener('input', e => {
+            MagicCanvas.color = e.target.value;
+            addColorToHistory(MagicCanvas.color);
+        });
+        mSizeInput.addEventListener('input', e => MagicCanvas.size = parseInt(e.target.value));
+
+        function addColorToHistory(hex) {
+            if (MagicCanvas.colorHistory.includes(hex)) return;
+            MagicCanvas.colorHistory.unshift(hex);
+            if (MagicCanvas.colorHistory.length > 6) MagicCanvas.colorHistory.pop();
+            updateColorHistoryUI();
+        }
+        
+        function updateColorHistoryUI() {
+            const hist = document.getElementById('color-history');
+            hist.innerHTML = '';
+            MagicCanvas.colorHistory.forEach(c => {
+                const d = document.createElement('div');
+                d.className = 'color-history-swatch'; d.style.backgroundColor = c;
+                d.onclick = () => { MagicCanvas.color = c; mColorInput.value = c; };
+                hist.appendChild(d);
+            });
+        }
+
+        // --- Eventos de Mouse/Touch ---
+        function getMousePos(e) {
+            const rect = MagicCanvas.el.getBoundingClientRect();
+            const scaleX = MagicCanvas.el.width / rect.width;
+            const scaleY = MagicCanvas.el.height / rect.height;
+            let cx = e.clientX, cy = e.clientY;
+            if(e.touches && e.touches.length > 0) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
+            return { x: (cx - rect.left) * scaleX, y: (cy - rect.top) * scaleY };
+        }
+
+        MagicCanvas.el.addEventListener('mousedown', startMagicDraw);
+        MagicCanvas.el.addEventListener('mousemove', drawMagic);
+        window.addEventListener('mouseup', endMagicDraw);
+        
+        MagicCanvas.el.addEventListener('touchstart', (e) => { e.preventDefault(); startMagicDraw(e); }, {passive:false});
+        MagicCanvas.el.addEventListener('touchmove', (e) => { e.preventDefault(); drawMagic(e); }, {passive:false});
+        window.addEventListener('touchend', endMagicDraw);
+
+        function startMagicDraw(e) {
+            MagicCanvas.isDrawing = true;
+            const pos = getMousePos(e);
+            MagicCanvas.startX = pos.x; MagicCanvas.startY = pos.y;
+            
+            if (MagicCanvas.tool === 'brush') {
+                MagicCanvas.currentPath = { type: 'path', color: MagicCanvas.color, size: MagicCanvas.size, points: [pos], layerId: 'manual' };
+            }
+            MagicCanvas.redoStack = []; // Quebra o histórico de refazer
+        }
+
+        function drawMagic(e) {
+            if (!MagicCanvas.isDrawing) return;
+            const pos = getMousePos(e);
+            
+            if (MagicCanvas.tool === 'brush') {
+                MagicCanvas.currentPath.points.push(pos);
+                redrawMagicCanvas();
+            } else {
+                // Primitivos temporários
+                MagicCanvas.tempShape = {
+                    type: MagicCanvas.tool, color: MagicCanvas.color, size: MagicCanvas.size,
+                    start: {x: MagicCanvas.startX, y: MagicCanvas.startY}, end: pos, layerId: 'manual'
+                };
+                redrawMagicCanvas();
+            }
+        }
+
+        function endMagicDraw() {
+            if (!MagicCanvas.isDrawing) return;
+            MagicCanvas.isDrawing = false;
+            if (MagicCanvas.tool === 'brush' && MagicCanvas.currentPath && MagicCanvas.currentPath.points.length > 1) {
+                MagicCanvas.drawings.push(MagicCanvas.currentPath);
+            } else if (MagicCanvas.tempShape) {
+                MagicCanvas.drawings.push(MagicCanvas.tempShape);
+            }
+            MagicCanvas.currentPath = null; MagicCanvas.tempShape = null;
+            redrawMagicCanvas();
+        }
+
+        // --- Renderização do Canvas ---
+        function redrawMagicCanvas() {
+            const ctx = MagicCanvas.ctx;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, MagicCanvas.el.width, MagicCanvas.el.height);
+            
+            const allItems = [...MagicCanvas.drawings];
+            if (MagicCanvas.currentPath) allItems.push(MagicCanvas.currentPath);
+            if (MagicCanvas.tempShape) allItems.push(MagicCanvas.tempShape);
+
+            allItems.forEach(item => {
+                // Verifica visibilidade da camada
+                if (item.layerId !== 'manual' && MagicCanvas.layersInfo[item.layerId] && !MagicCanvas.layersInfo[item.layerId].visible) return;
+
+                ctx.strokeStyle = item.color; ctx.fillStyle = item.color;
+                ctx.lineWidth = item.size;
+                
+                if (item.type === 'path') {
+                    if(!item.points || item.points.length < 2) return;
+                    ctx.beginPath();
+                    ctx.moveTo(item.points[0].x, item.points[0].y);
+                    for (let i = 1; i < item.points.length; i++) {
+                        ctx.lineTo(item.points[i].x, item.points[i].y);
+                    }
+                    ctx.stroke();
+                } 
+                else if (item.type === 'line') {
+                    ctx.beginPath(); ctx.moveTo(item.start.x, item.start.y); ctx.lineTo(item.end.x, item.end.y); ctx.stroke();
+                }
+                else if (item.type === 'rect') {
+                    ctx.strokeRect(item.start.x, item.start.y, item.end.x - item.start.x, item.end.y - item.start.y);
+                }
+                else if (item.type === 'circle') {
+                    const r = Math.sqrt(Math.pow(item.end.x - item.start.x, 2) + Math.pow(item.end.y - item.start.y, 2));
+                    ctx.beginPath(); ctx.arc(item.start.x, item.start.y, r, 0, Math.PI * 2); ctx.stroke();
+                }
+                else if (item.type === 'star') {
+                    const r = Math.sqrt(Math.pow(item.end.x - item.start.x, 2) + Math.pow(item.end.y - item.start.y, 2));
+                    drawStar(ctx, item.start.x, item.start.y, 5, r, r/2);
+                }
+                else if (item.type === 'heart') {
+                    const w = Math.abs(item.end.x - item.start.x) * 2; const h = Math.abs(item.end.y - item.start.y) * 2;
+                    drawHeart(ctx, item.start.x, item.start.y, w, h);
+                }
+            });
+        }
+
+        function drawStar(ctx, cx, cy, spikes, outerR, innerR) {
+            let rot = Math.PI / 2 * 3, x = cx, y = cy, step = Math.PI / spikes;
+            ctx.beginPath(); ctx.moveTo(cx, cy - outerR);
+            for (let i = 0; i < spikes; i++) {
+                x = cx + Math.cos(rot) * outerR; y = cy + Math.sin(rot) * outerR; ctx.lineTo(x, y); rot += step;
+                x = cx + Math.cos(rot) * innerR; y = cy + Math.sin(rot) * innerR; ctx.lineTo(x, y); rot += step;
+            }
+            ctx.lineTo(cx, cy - outerR); ctx.closePath(); ctx.stroke();
+        }
+
+        function drawHeart(ctx, x, y, width, height) {
+            ctx.save(); ctx.beginPath(); let topCurveHeight = height * 0.3;
+            ctx.moveTo(x, y + topCurveHeight);
+            ctx.bezierCurveTo(x, y, x - width / 2, y, x - width / 2, y + topCurveHeight);
+            ctx.bezierCurveTo(x - width / 2, y + (height + topCurveHeight) / 2, x, y + (height + topCurveHeight) / 2, x, y + height);
+            ctx.bezierCurveTo(x, y + (height + topCurveHeight) / 2, x + width / 2, y + (height + topCurveHeight) / 2, x + width / 2, y + topCurveHeight);
+            ctx.bezierCurveTo(x + width / 2, y, x, y, x, y + topCurveHeight);
+            ctx.closePath(); ctx.stroke(); ctx.restore();
+        }
+
+        // --- Controles de Histórico ---
+        document.getElementById('btn-magic-undo').addEventListener('click', () => {
+            if(MagicCanvas.drawings.length > 0) {
+                MagicCanvas.redoStack.push(MagicCanvas.drawings.pop()); redrawMagicCanvas();
+            }
+        });
+        document.getElementById('btn-magic-redo').addEventListener('click', () => {
+            if(MagicCanvas.redoStack.length > 0) {
+                MagicCanvas.drawings.push(MagicCanvas.redoStack.pop()); redrawMagicCanvas();
+            }
+        });
+        document.getElementById('btn-magic-clear').addEventListener('click', () => {
+            if(confirm("Tem certeza que deseja apagar todo o desenho?")) {
+                MagicCanvas.drawings = []; MagicCanvas.redoStack = []; MagicCanvas.layersInfo = {};
+                updateMagicLayersUI(); redrawMagicCanvas();
+            }
+        });
+
+        // --- Importar JS e Traduzir para Desenho ---
+        document.getElementById('magic-import-js').addEventListener('change', (e) => {
+            const file = e.target.files[0]; if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                showLoader("Traduzindo Código...", "Recriando traços na lousa...");
+                setTimeout(() => { parseJsToCanvas(ev.target.result); hideLoader(); }, 100);
+            };
+            reader.readAsText(file);
+        });
+
+        function parseJsToCanvas(jsText) {
+            // Procura o padrão gerado pelo nosso Studio: { nome: "[NomeCor]...", del: 0, trs: [ ... ] }
+            const cmdRegex = /nome:\s*"\[(.*?)\](.*?)",[\s\S]*?trs:\s*\[([\s\S]*?)\]\s*\}/g;
+            let match; let layersAdded = 0;
+
+            while ((match = cmdRegex.exec(jsText)) !== null) {
+                const colorName = match[1];
+                let hex = '#000000';
+                const dicEntry = colorDictionary.find(c => c.name.toLowerCase() === colorName.toLowerCase());
+                if (dicEntry) {
+                    hex = "#" + dicEntry.rgb.map(x => x.toString(16).padStart(2, '0')).join('');
+                }
+                addColorToHistory(hex);
+
+                const layerId = 'layer_' + colorName + '_' + Date.now();
+                MagicCanvas.layersInfo[layerId] = { name: colorName, color: hex, visible: true };
+
+                const trsText = match[3];
+                // Extrai arrays de coordenadas [x, y]
+                const traces = trsText.match(/\[\s*(?:\[\s*\d+\s*,\s*\d+\s*\]\s*,?\s*)+\]/g);
+                if (traces) {
+                    traces.forEach(traceStr => {
+                        const points = [];
+                        const ptRegex = /\[\s*(\d+)\s*,\s*(\d+)\s*\]/g;
+                        let ptMatch;
+                        while((ptMatch = ptRegex.exec(traceStr)) !== null) {
+                            points.push({x: parseInt(ptMatch[1]), y: parseInt(ptMatch[2])});
+                        }
+                        if (points.length > 1) {
+                            MagicCanvas.drawings.push({ type: 'path', color: hex, size: 2, points: points, layerId: layerId });
+                        }
+                    });
+                    layersAdded++;
+                }
+            }
+
+            if (layersAdded > 0) {
+                updateMagicLayersUI(); redrawMagicCanvas();
+                showToast(`Script importado! ${layersAdded} camadas recriadas.`);
+            } else {
+                showToast(`Nenhum traço reconhecido no script.`, true);
+            }
+        }
+
+        function updateMagicLayersUI() {
+            const list = document.getElementById('magic-layers-list');
+            list.innerHTML = '';
+            const keys = Object.keys(MagicCanvas.layersInfo);
+            if (keys.length === 0) {
+                list.innerHTML = '<div class="text-slate-500 italic">Nenhuma camada JS importada. Desenhos manuais ficam na camada base.</div>';
+                return;
+            }
+            keys.forEach(id => {
+                const info = MagicCanvas.layersInfo[id];
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between bg-slate-900/50 p-2 rounded border border-slate-700';
+                div.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full" style="background-color: ${info.color}"></div>
+                        <span class="font-bold text-slate-200">${info.name}</span>
+                    </div>
+                    <label class="cursor-pointer text-[10px] text-slate-400 hover:text-white flex items-center gap-1">
+                        <input type="checkbox" class="accent-purple-500" ${info.visible ? 'checked' : ''} onchange="toggleLayerVis('${id}', this.checked)"> Visível
+                    </label>
+                `;
+                list.appendChild(div);
+            });
+        }
+        
+        window.toggleLayerVis = function(id, isVis) {
+            if(MagicCanvas.layersInfo[id]) { MagicCanvas.layersInfo[id].visible = isVis; redrawMagicCanvas(); }
+        }
+
+        // --- Enviar e Receber Canvas pela Nuvem ---
+        document.getElementById('btn-magic-send').addEventListener('click', () => {
+            if (MagicCanvas.drawings.length === 0) { showToast('A lousa está vazia!', true); return; }
+            
+            const canvasState = {
+                drawings: MagicCanvas.drawings,
+                layersInfo: MagicCanvas.layersInfo
+            };
+            
+            const jsonStr = JSON.stringify(canvasState);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            uploadGenericToSupabase(blob, `desenho_${Date.now()}_canvas.json`, 'application/json', 'magic-upload-result');
+        });
+
+        async function carregarLousaDaNuvem(url) {
+            try {
+                showLoader("Carregando Desenho", "Restaurando traços e camadas...");
+                const response = await fetch(url);
+                const json = await response.json();
+                
+                if (json && json.drawings) {
+                    MagicCanvas.drawings = json.drawings;
+                    MagicCanvas.layersInfo = json.layersInfo || {};
+                    MagicCanvas.redoStack = [];
+                    document.querySelector('.transf-tab-btn[data-mode="canvas"]').click(); // Vai pra aba da Lousa
+                    updateMagicLayersUI();
+                    redrawMagicCanvas();
+                    showToast("Desenho carregado com sucesso!");
+                } else { throw new Error("Formato inválido."); }
+            } catch (e) {
+                showToast("Erro ao ler o desenho: " + e.message, true);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        // Inicializa Canvas
+        initMagicCanvas();
 
         async function baixarArquivo(url, fileName) {
             try {
