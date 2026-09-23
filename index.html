@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -1214,31 +1213,50 @@
                 }
             }
 
-            let tPts = traces.reduce((s, tr) => s + tr.length, 0);
-            let uDur = (layer.duration || 0) * 1000;
             let playSound = D.notifyAutojs.checked;
 
-            // Template Script (Auto.js Anti-Crash)
-            let s = `// Uny Automaton Pro\n// Camada ${order}: ${layer.colorName} | Modo: ${drawModeLabels[layer.drawMode]}\n\n`;
-            s += `setScreenMetrics(${State.screenW}, ${State.screenH});\nvar MULTIPLICADOR = 0.200;\n\n`;
-            s += `function desenharWarmup(pts){ if(pts.length<2)return; gesture.apply(null,[Math.max(300,pts.length*15)].concat(pts)); sleep(200); }\n`;
-            s += `function desenharTraco(pts, uDur){\n  if(pts.length<2)return;\n  var dur = uDur > 0 ? uDur : Math.floor(Math.max(100,pts.length*10)*MULTIPLICADOR);\n`;
-            s += `  if(dur<Math.max(80,pts.length*5)) dur=Math.max(80,pts.length*5);\n  if(dur>60000) dur=60000;\n  gesture.apply(null,[dur].concat(pts)); sleep(35);\n}\n\n`;
+            // Template Script (Auto.js) seguindo a estrutura EXATA do arquivo de referência "Folhas verdes.js"
+            let s = `// --- AUTO.JS VECTOR STUDIO ---\n// Engine de Múltiplos Arquivos | Modo: Precisão\n// Continuidade de Traço Ativa: Sem quebras em segmentos!\n\n`;
             
-            s += `var cam = [\n  { nome: "Warmup", isWarmup: true, del: 0, trs: [\n    [[333,1225], [332,1225], [331,1225], [330,1225]]\n  ] },\n`;
-            s += `  { nome: "[${layer.colorName}]", del: 0, userDurMs: ${uDur}, totalPts: ${tPts}, trs: [\n`;
+            s += `setScreenMetrics(${State.screenW}, ${State.screenH});\n\n`;
+            s += `var MULTIPLICADOR = 0.200;\n\n`;
             
-            s += traces.map(tr => `    [\n      ${tr.join(', ')}\n    ]`).join(',\n');
+            s += `function desenharWarmup(pts) {\n    if(pts.length < 2) return;\n    var dur = Math.max(300, pts.length * 15);\n    gesture.apply(null, [dur].concat(pts));\n    sleep(200);\n}\n\n`;
             
-            s += `\n  ] }\n];\n\n`;
-            s += `for (var k=0; k<cam.length; k++) {\n  var cmd=cam[k];\n  if (cmd.isWarmup) { for (var t=0; t<cmd.trs.length; t++) desenharWarmup(cmd.trs[t]); continue; }\n`;
-            s += `  toastLog("Desenhando: " + cmd.nome);\n  for (var t=0; t<cmd.trs.length; t++) {\n`;
-            s += `    var tDur = (cmd.userDurMs>0 && cmd.totalPts>0) ? Math.max(10, Math.floor((cmd.trs[t].length/cmd.totalPts)*cmd.userDurMs)) : 0;\n`;
-            s += `    desenharTraco(cmd.trs[t], tDur);\n  }\n}\ntoastLog("Camada ${order} Finalizada!");\n`;
+            s += `function desenharTraco(pts) {\n    if(pts.length < 2) return;\n    var dur = Math.floor(Math.max(100, pts.length * 10) * MULTIPLICADOR);\n    if(dur < Math.max(80, pts.length * 5)) dur = Math.max(80, pts.length * 5);\n    if(dur > 60000) dur = 60000;\n    gesture.apply(null, [dur].concat(pts)); sleep(35);\n}\n\n`;
+            
+            s += `var cam = [\n`;
+            s += `  { nome: "Pré-Traço Inicial (Anti-Bug)", isWarmup: true, del: 0, trs: [\n`;
+            s += `    [\n      [527,960], [527,961], [527,962], [527,963], [528,963], [528,964], [528,965], [528,966], [528,967], [529,967], [529,968], [529,969], [529,970], [529,971], [529,972]\n    ]\n  ] },\n`;
+            
+            // Quebra as coordenadas a cada 10 posições para ficar idêntico ao seu JS de referência
+            let tracesStr = traces.map(tr => {
+                let formattedLine = '';
+                for(let i = 0; i < tr.length; i += 10) {
+                    formattedLine += tr.slice(i, i + 10).join(', ');
+                    if(i + 10 < tr.length) formattedLine += ', \n      ';
+                }
+                return `    [\n      ${formattedLine}\n    ]`;
+            }).join(',\n');
+            
+            s += `  { nome: "[${layer.colorName}] C-${order}", del: 0, trs: [\n${tracesStr}\n  ] }\n];\n\n`;
+            
+            s += `// --- EXECUÇÃO PRINCIPAL ---\n`;
+            s += `for (var k = 0; k < cam.length; k++) {\n`;
+            s += `    var cmd = cam[k];\n`;
+            s += `    if (cmd.isWarmup) {\n`;
+            s += `        toast("Executando Pré-Traço...");\n`;
+            s += `        for (var t = 0; t < cmd.trs.length; t++) { desenharWarmup(cmd.trs[t]); }\n`;
+            s += `        continue;\n`;
+            s += `    }\n`;
+            s += `    if (cmd.del > 0) { toast("Espere " + (cmd.del/1000) + "s: " + cmd.nome); sleep(cmd.del); }\n`;
+            s += `    else { toast("A desenhar: " + cmd.nome); }\n`;
+            s += `    for (var t = 0; t < cmd.trs.length; t++) { desenharTraco(cmd.trs[t]); sleep(35); }\n`;
+            s += `}\n`;
+            s += `toast("Composição Finalizada!");\n`;
 
             if (playSound) {
-                s += `\ndevice.vibrate([0, 300, 100, 300]);\ntry{\n  var rm = android.media.RingtoneManager;\n`;
-                s += `  var rt = rm.getRingtone(context, rm.getDefaultUri(rm.TYPE_NOTIFICATION));\n  if(rt) rt.play();\n}catch(e){}\nsleep(2000);\n`;
+                s += `\ntry { device.vibrate([0, 300, 100, 300]); var rm = android.media.RingtoneManager; var rt = rm.getRingtone(context, rm.getDefaultUri(rm.TYPE_NOTIFICATION)); if(rt) rt.play(); sleep(2000); } catch(e) {}\n`;
             }
             return s;
         }
@@ -1326,4 +1344,3 @@
     </script>
 </body>
 </html>
-```
