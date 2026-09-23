@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -496,11 +497,26 @@
             });
         });
 
+        // Polyfill para UUID (Evita travamentos de segurança ao usar offline/file://)
+        function generateUUID() {
+            if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
         
         // Supabase Configs
         const SUPABASE_URL = "https://rmplwgtizbqzmvabrbhe.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtcGx3Z3RpemJxem12YWJyYmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMDI5NzIsImV4cCI6MjEwNTY3ODk3Mn0.1Y23eINegprxaFa-HtttbJZsMgrT-Wmq1heTT54YaCw";
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let supabaseClient = null;
+        
+        // Carregamento Seguro (Não quebra o site se estiver offline)
+        try {
+            if (typeof supabase !== 'undefined') {
+                supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            }
+        } catch (e) { console.warn("Supabase não pôde ser inicializado:", e); }
 
         let selectedTransferFile = null;
 
@@ -521,10 +537,14 @@
                 resultBox.innerHTML = '<span class="text-error">Selecione um arquivo primeiro.</span>';
                 return;
             }
+            if (!supabaseClient) {
+                resultBox.innerHTML = '<span class="text-error">Erro de conexão com a Nuvem. Verifique sua internet.</span>';
+                return;
+            }
             resultBox.innerHTML = '<span class="text-info animate-pulse">Enviando arquivo...</span>';
 
             try {
-                const id = crypto.randomUUID();
+                const id = generateUUID();
                 const filePath = id + "/" + selectedTransferFile.name;
 
                 const { error: uploadError } = await supabaseClient.storage.from("files").upload(filePath, selectedTransferFile, {
@@ -765,8 +785,8 @@
             
             if (!svgEl) { showToast("SVG inválido", true); return; }
 
-            // Normaliza Dimensões
-            let vb = svgEl.viewBox.baseVal;
+            // Normaliza Dimensões com Prevenção de Erros
+            let vb = svgEl.viewBox ? svgEl.viewBox.baseVal : null;
             if (vb && vb.width > 0 && vb.height > 0) {
                 State.svgNativeW = vb.width; State.svgNativeH = vb.height;
             } else {
@@ -985,20 +1005,21 @@
                     <div class="w-8 h-8 rounded-full border-2 border-white/20 shadow-inner flex-shrink-0" style="background-color: ${layer.color}"></div>
                     
                     <div class="flex flex-col flex-grow min-w-[120px]">
-                        <input type="text" class="layer-name bg-transparent border-b border-transparent focus:border-purple-500 outline-none text-sm font-bold text-white w-full" value="${layer.colorName}">
-                        <span class="text-[10px] text-slate-400 font-mono">${layer.paths.length} vetores</span>
+                    <input type="text" class="layer-name bg-transparent border-b border-transparent focus:border-purple-500 outline-none text-sm font-bold text-white w-full" value="${layer.colorName}">
+                    <span class="text-[10px] text-slate-400 font-mono">${layer.paths.length} vetores</span>
+                </div>
+
+                <div class="flex items-center gap-2 w-full lg:w-auto justify-between lg:justify-end mt-2 lg:mt-0">
+                    <div class="flex flex-col items-center mr-2">
+                        <span class="text-[9px] text-slate-400 uppercase">Tempo (s)</span>
+                        <input type="number" class="layer-dur w-12 bg-slate-900 border border-slate-600 rounded text-center text-xs py-0.5 text-emerald-400" value="${layer.duration}">
                     </div>
 
-                    <div class="flex items-center gap-2 w-full lg:w-auto justify-between lg:justify-end mt-2 lg:mt-0">
-                        <div class="flex flex-col items-center mr-2">
-                            <span class="text-[9px] text-slate-400 uppercase">Tempo (s)</span>
-                            <input type="number" class="layer-dur w-12 bg-slate-900 border border-slate-600 rounded text-center text-xs py-0.5 text-emerald-400" value="${layer.duration}">
-                        </div>
-
-                        <div class="flex items-center gap-1">
-                            <button class="layer-mode rounded px-2 py-1 transition-colors ${mClass}" title="Alterar Modo">${mLabel}</button>
-                            <button class="layer-vis p-1.5 hover:bg-white/10 rounded transition-colors ${eyeClass}">👁</button>
-                            <div class="flex flex-col gap-0.5 ml-1">
+                    <div class="flex items-center gap-1">
+                        <button class="btn-download-single text-blue-400 hover:text-white bg-blue-900/30 hover:bg-blue-600 rounded px-2 py-1 font-bold text-xs transition-colors" title="Baixar apenas esta camada (.js)">⬇️ JS</button>
+                        <button class="layer-mode rounded px-2 py-1 transition-colors ${mClass}" title="Alterar Modo">${mLabel}</button>
+                        <button class="layer-vis p-1.5 hover:bg-white/10 rounded transition-colors ${eyeClass}">👁</button>
+                        <div class="flex flex-col gap-0.5 ml-1">
                                 <button class="btn-up text-slate-400 hover:text-white leading-none px-1" ${i===0?'disabled opacity-30':''}>▲</button>
                                 <button class="btn-dn text-slate-400 hover:text-white leading-none px-1" ${i===State.extractedLayers.length-1?'disabled opacity-30':''}>▼</button>
                             </div>
@@ -1035,6 +1056,11 @@
                         const t = State.extractedLayers[i]; State.extractedLayers[i]=State.extractedLayers[i+1]; State.extractedLayers[i+1]=t;
                         renderLayersUI(); drawCanvasPreview();
                     }
+                });
+                
+                li.querySelector('.btn-download-single').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    downloadSingleLayer(i);
                 });
 
                 // Drag n Drop reordering
@@ -1217,6 +1243,37 @@
             return s;
         }
 
+        async function downloadSingleLayer(index) {
+            const layer = State.extractedLayers[index];
+            if (!layer) return;
+            const res = parseFloat(D.resInput.value) || 1;
+            const order = index + 1;
+
+            showLoader("Gerando Script", `Processando ${layer.colorName}...`);
+
+            try {
+                await new Promise(r => setTimeout(r, 40));
+                const script = await buildScriptString(layer, order, Math.max(1, res));
+                
+                const blob = new Blob([script], {type: "text/javascript;charset=utf-8"});
+                const safeName = layer.colorName.replace(/[^a-zA-Z0-9À-ÿ]/g, '_');
+                const fileName = `${order}_${safeName}.js`;
+                
+                const link = document.createElement("a"); 
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName; 
+                document.body.appendChild(link);
+                link.click(); 
+                document.body.removeChild(link); 
+                URL.revokeObjectURL(link.href);
+
+                hideLoader();
+                showToast(`Camada ${layer.colorName} baixada!`);
+            } catch(e) {
+                hideLoader(); showToast('Erro: ' + e.message, true);
+            }
+        }
+
         D.btnGenZip.addEventListener('click', async () => {
             if (!State.currentSvgElement) return;
             const res = parseFloat(D.resInput.value) || 1;
@@ -1269,3 +1326,4 @@
     </script>
 </body>
 </html>
+```
