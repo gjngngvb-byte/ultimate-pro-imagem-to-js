@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -196,7 +197,7 @@
                     <input type="file" id="file-input" class="hidden" accept=".svg, image/png, image/jpeg">
                 </div>
 
-                <!-- Painel de Configuração do Vetorizador (Oculto até enviar Imagem) -->
+                <!-- Painel de Configuração do Vetorizador -->
                 <div id="vectorizer-panel" class="hidden glass-panel p-6 flex-col gap-5 border-l-4 border-l-blue-500">
                     <div class="flex items-center justify-between mb-2">
                         <div>
@@ -288,7 +289,7 @@
                             </button>
                             <div class="flex items-center gap-2">
                                 <label class="text-xs text-slate-400">Densidade (Hachura)</label>
-                                <input type="number" id="resolution-input" value="1" min="1" max="30" class="w-14 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-center text-white" title="Distância entre as linhas de preenchimento.">
+                                <input type="number" id="resolution-input" value="1" min="1" max="30" class="w-14 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-center text-white" title="Distância entre as linhas de preenchimento. Apenas para modo Hachura.">
                             </div>
                         </div>
                         <label class="flex items-center gap-2 cursor-pointer text-xs">
@@ -990,7 +991,7 @@
                 }
                 else if (item.type === 'heart') {
                     const w = Math.abs(item.end.x - item.start.x) * 2; const h = Math.abs(item.end.y - item.start.y) * 2;
-                    drawHeart(ctx, item.start.x, item.start.y, w, h);
+                    drawHeart(ctx, x, y, w, h);
                 }
             });
         }
@@ -1678,12 +1679,14 @@
             const doFill = (layer.drawMode === 'hachura' || layer.drawMode === 'completo');
             const doStroke = (layer.drawMode === 'contorno' || layer.drawMode === 'completo');
             
+            // É importante definir isso fora para que o doStroke também possa usar
+            const tempSvg = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
+            
             // Hachura (Matemática Otimizada com Step e Intersection)
             if (doFill) {
                 const offCanvas = document.createElement('canvas');
                 offCanvas.width = Math.round(State.svgNativeW); offCanvas.height = Math.round(State.svgNativeH);
                 const offCtx = offCanvas.getContext('2d');
-                const tempSvg = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
 
                 for (let j = 0; j < layer.paths.length; j++) {
                     const path = layer.paths[j]; const d = path.getAttribute('d'); if(!d) continue;
@@ -1731,29 +1734,56 @@
                 }
             }
 
-            // Contorno (Linha Interpolada)
+            // Contorno (Linha Interpolada de Alta Fidelidade)
             if (doStroke) {
-                const stepLen = Math.max(1, resolution / 2.0);
+                const stepLen = 0.5; // Fixo para Máxima Precisão (Como solicitado)
+                const domPoint = tempSvg.createSVGPoint();
+
                 for (let j = 0; j < layer.paths.length; j++) {
-                    const path = layer.paths[j]; const ctm = path.getCTM(); if(!ctm) continue;
-                    let tLen = 0; try{ tLen = path.getTotalLength(); }catch(e){ continue; }
-                    if(tLen<=0) continue;
-                    let pts = [];
-                    for (let l=0; l<=tLen; l+=stepLen) {
-                        const pt = path.getPointAtLength(l).matrixTransform(ctm);
-                        let fX = Math.round((pt.x*State.svgScale)+State.svgOffsetX);
-                        let fY = Math.round((pt.y*State.svgScale)+State.svgOffsetY);
+                    const path = layer.paths[j]; 
+                    const ctm = path.getCTM(); 
+                    if (!ctm) continue;
+                    
+                    let tLen = 0; 
+                    try { tLen = path.getTotalLength(); } catch(e) { continue; }
+                    if (tLen <= 0) continue;
+                    
+                    let currentBlock = [];
+                    let lastRawPt = null;
+                    
+                    for (let l = 0; l <= tLen; l += stepLen) {
+                        let rawPt = path.getPointAtLength(l);
+                        
+                        // Sistema de Detecção de Salto (Gap) 
+                        if (lastRawPt) {
+                            let svgDist = Math.hypot(rawPt.x - lastRawPt.x, rawPt.y - lastRawPt.y);
+                            if (svgDist > stepLen * 4) {
+                                if (currentBlock.length > 1) traces.push(currentBlock);
+                                currentBlock = [];
+                            }
+                        }
+
+                        domPoint.x = rawPt.x;
+                        domPoint.y = rawPt.y;
+                        let matrixPt = domPoint.matrixTransform(ctm);
+                        
+                        let fX = Math.round((matrixPt.x * State.svgScale) + State.svgOffsetX);
+                        let fY = Math.round((matrixPt.y * State.svgScale) + State.svgOffsetY);
                         if(State.flipYAxis) fY = State.screenH - fY;
-                        pts.push(`[${fX}, ${fY}]`);
+                        
+                        currentBlock.push(`[${fX}, ${fY}]`);
+                        lastRawPt = rawPt;
                     }
-                    if(pts.length>=2) {
+                    
+                    if (currentBlock.length > 1) {
                         const MAX = 5000;
-                        for(let c=0; c<pts.length; c+=MAX) {
-                            let chunk = pts.slice(c, c+MAX+1);
-                            if(chunk.length>=2) traces.push(chunk);
+                        for(let c = 0; c < currentBlock.length; c += MAX) {
+                            let chunk = currentBlock.slice(c, c + MAX + 1);
+                            if(chunk.length >= 2) traces.push(chunk);
                         }
                     }
-                    if(j%5===0) await new Promise(r=>setTimeout(r,5));
+                    
+                    if (j % 5 === 0) await new Promise(r => setTimeout(r, 5));
                 }
             }
 
@@ -1767,7 +1797,21 @@
             
             s += `function desenharWarmup(pts) {\n    if(pts.length < 2) return;\n    var dur = Math.max(300, pts.length * 15);\n    gesture.apply(null, [dur].concat(pts));\n    sleep(200);\n}\n\n`;
             
-            s += `function desenharTraco(pts) {\n    if(pts.length < 2) return;\n    var dur = Math.floor(Math.max(100, pts.length * 10) * MULTIPLICADOR);\n    if(dur < Math.max(80, pts.length * 5)) dur = Math.max(80, pts.length * 5);\n    if(dur > 60000) dur = 60000;\n    gesture.apply(null, [dur].concat(pts)); sleep(35);\n}\n\n`;
+            s += `function desenharTraco(pts, customMult) {\n`;
+            s += `    if(pts.length < 2) return;\n`;
+            s += `    var dur = 0;\n`;
+            s += `    if (customMult) {\n`;
+            s += `        // Se o usuario digitou um tempo, ignora os limites padrao e usa a exatidao matematica\n`;
+            s += `        dur = Math.floor(pts.length * 10 * customMult);\n`;
+            s += `        if(dur < 10) dur = 10; // prevencao contra gesto instataneo (0ms)\n`;
+            s += `    } else {\n`;
+            s += `        // Comportamento original com os "clamps" de limitacao\n`;
+            s += `        dur = Math.floor(Math.max(100, pts.length * 10) * MULTIPLICADOR);\n`;
+            s += `        if(dur < Math.max(80, pts.length * 5)) dur = Math.max(80, pts.length * 5);\n`;
+            s += `        if(dur > 60000) dur = 60000;\n`;
+            s += `    }\n`;
+            s += `    gesture.apply(null, [dur].concat(pts));\n`;
+            s += `}\n\n`;
             
             s += `var cam = [\n`;
             s += `  { nome: "Pré-Traço Inicial (Anti-Bug)", isWarmup: true, del: 0, trs: [\n`;
@@ -1783,7 +1827,8 @@
                 return `    [\n      ${formattedLine}\n    ]`;
             }).join(',\n');
             
-            s += `  { nome: "[${layer.colorName}] C-${order}", del: 0, trs: [\n${tracesStr}\n  ] }\n];\n\n`;
+            const targetTime = layer.duration > 0 ? layer.duration * 1000 : 0;
+            s += `  { nome: "[${layer.colorName}] C-${order}", del: 0, targetTime: ${targetTime}, trs: [\n${tracesStr}\n  ] }\n];\n\n`;
             
             s += `// --- EXECUÇÃO PRINCIPAL ---\n`;
             s += `for (var k = 0; k < cam.length; k++) {\n`;
@@ -1795,7 +1840,19 @@
             s += `    }\n`;
             s += `    if (cmd.del > 0) { toast("Espere " + (cmd.del/1000) + "s: " + cmd.nome); sleep(cmd.del); }\n`;
             s += `    else { toast("A desenhar: " + cmd.nome); }\n`;
-            s += `    for (var t = 0; t < cmd.trs.length; t++) { desenharTraco(cmd.trs[t]); sleep(35); }\n`;
+            s += `    \n`;
+            s += `    // Calcula o multiplicador exato se o usuario definiu o tempo em segundos\n`;
+            s += `    var currentMult = null;\n`;
+            s += `    if (cmd.targetTime > 0) {\n`;
+            s += `        var totalPts = 0;\n`;
+            s += `        for (var t = 0; t < cmd.trs.length; t++) totalPts += cmd.trs[t].length;\n`;
+            s += `        var sleepTime = cmd.trs.length * 35;\n`;
+            s += `        var gestureTime = cmd.targetTime - sleepTime;\n`;
+            s += `        if (gestureTime < 100) gestureTime = 100;\n`;
+            s += `        currentMult = gestureTime / Math.max(1, (totalPts * 10));\n`;
+            s += `    }\n`;
+            s += `    \n`;
+            s += `    for (var t = 0; t < cmd.trs.length; t++) { desenharTraco(cmd.trs[t], currentMult); sleep(35); }\n`;
             s += `}\n`;
             s += `toast("Composição Finalizada!");\n`;
 
@@ -1888,3 +1945,4 @@
     </script>
 </body>
 </html>
+```
