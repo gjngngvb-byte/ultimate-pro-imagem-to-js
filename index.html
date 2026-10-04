@@ -150,11 +150,19 @@
         .color-history-swatch:hover { transform: scale(1.1); }
         
         #magic-canvas-container {
-            width: 100%; height: 60vh; background-color: #ffffff; border-radius: 12px;
-            overflow: hidden; position: relative; border: 2px solid var(--card-border);
+            width: 100%; height: 60vh;
+            display: flex; justify-content: center; align-items: center;
+            background-image: linear-gradient(45deg, #0f172a 25%, transparent 25%), linear-gradient(-45deg, #0f172a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #0f172a 75%), linear-gradient(-45deg, transparent 75%, #0f172a 75%);
+            background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px; background-color: #030407;
+            border-radius: 12px; overflow: hidden; position: relative; border: 2px solid var(--card-border);
             box-shadow: inset 0 0 20px rgba(0,0,0,0.1); cursor: crosshair; touch-action: none;
         }
-        #magic-canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
+        #magic-canvas {
+            background-color: #ffffff;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
 
     </style>
 </head>
@@ -194,9 +202,18 @@
                     <h3 class="text-lg font-semibold text-slate-200">Arraste uma Imagem ou SVG aqui</h3>
                     <p class="text-slate-400 text-sm mt-2">Identificação inteligente: Imagens (PNG/JPG) serão vetorizadas, SVGs serão extraídos.</p>
                     <input type="file" id="file-input" class="hidden" accept=".svg, image/png, image/jpeg">
+                    
+                    <div class="mt-6 p-4 bg-slate-900/80 rounded-xl border border-slate-700 w-full max-w-sm mx-auto flex flex-col gap-2 shadow-inner" onclick="event.stopPropagation()">
+                        <p class="text-xs text-slate-300 font-bold mb-1">Ou baixe um arquivo direto da Nuvem:</p>
+                        <div class="flex gap-2">
+                            <input type="text" id="studio-code-input" maxlength="8" placeholder="CÓDIGO" class="transfer-input transfer-input-code p-2 w-2/3 uppercase text-center text-sm h-10">
+                            <button id="btn-recv-studio" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg w-1/3 text-sm h-10 shadow-lg transition-colors">Buscar</button>
+                        </div>
+                        <div id="recv-studio-result" class="text-sm mt-1"></div>
+                    </div>
                 </div>
 
-                <!-- Painel de Configuração do Vetorizador -->
+                <!-- Painel de Configuração do Vetorizador (Oculto até enviar Imagem) -->
                 <div id="vectorizer-panel" class="hidden glass-panel p-6 flex-col gap-5 border-l-4 border-l-blue-500">
                     <div class="flex items-center justify-between mb-2">
                         <div>
@@ -288,7 +305,7 @@
                             </button>
                             <div class="flex items-center gap-2">
                                 <label class="text-xs text-slate-400">Densidade (Hachura)</label>
-                                <input type="number" id="resolution-input" value="1" min="1" max="30" class="w-14 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-center text-white" title="Distância entre as linhas de preenchimento. Apenas para modo Hachura.">
+                                <input type="number" id="resolution-input" value="1" min="1" max="30" class="w-14 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-center text-white" title="Distância entre as linhas de preenchimento.">
                             </div>
                         </div>
                         <label class="flex items-center gap-2 cursor-pointer text-xs">
@@ -308,10 +325,17 @@
                             <label class="text-[10px] uppercase font-bold text-slate-400 mb-1">Nome do Arquivo ZIP</label>
                             <input type="text" id="zip-filename" value="Meus_Scripts_AutoJS" class="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-purple-500 outline-none w-full">
                         </div>
-                        <button id="btn-generate-zip" class="w-full bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex justify-center items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                            Baixar Scripts (ZIP)
-                        </button>
+                        <div class="flex gap-2">
+                            <button id="btn-generate-zip" class="w-1/2 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all flex justify-center items-center gap-1 text-xs">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                Baixar ZIP
+                            </button>
+                            <button id="btn-send-zip" class="w-1/2 bg-gradient-to-r from-blue-600 to-indigo-500 hover:from-blue-500 hover:to-indigo-400 text-white font-bold py-3 px-2 rounded-xl shadow-lg transition-all flex justify-center items-center gap-1 text-xs">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                                Enviar Nuvem
+                            </button>
+                        </div>
+                        <div id="zip-upload-result" class="text-center text-xs"></div>
                     </div>
                 </div>
             </div>
@@ -375,8 +399,13 @@
                     <div id="upload-text-result" class="text-center text-sm"></div>
                 </div>
                 <div class="glass-panel p-6 flex flex-col gap-4">
-                    <h2 class="text-lg font-bold">📥 Área de Leitura</h2>
-                    <textarea id="transfer-text-output" class="w-full h-64 bg-slate-900 border border-slate-600 rounded-xl p-4 text-sm font-mono text-emerald-400 outline-none resize-none" readonly placeholder="O texto recebido aparecerá aqui..."></textarea>
+                    <h2 class="text-lg font-bold flex items-center gap-2">📥 Receber / Área de Leitura</h2>
+                    <div class="flex gap-2">
+                        <input type="text" id="text-code-input" maxlength="8" placeholder="CÓDIGO" class="transfer-input transfer-input-code p-2 w-2/3 uppercase text-center text-sm h-12">
+                        <button id="btn-recv-text" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl w-1/3 shadow-lg transition-colors">Buscar</button>
+                    </div>
+                    <div id="recv-text-result" class="text-sm"></div>
+                    <textarea id="transfer-text-output" class="w-full h-48 bg-slate-900 border border-slate-600 rounded-xl p-4 text-sm font-mono text-emerald-400 outline-none resize-none" readonly placeholder="O texto recebido aparecerá aqui..."></textarea>
                     <button id="btn-copy-text" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all">Copiar Texto</button>
                 </div>
             </div>
@@ -438,6 +467,13 @@
                         📤 Enviar Desenho
                     </button>
                     <div id="magic-upload-result" class="text-center text-xs"></div>
+
+                    <h3 class="font-bold text-sm text-center border-b border-slate-700 pb-2 mt-2">📥 Receber Desenho</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="lousa-code-input" maxlength="8" placeholder="CÓDIGO" class="transfer-input transfer-input-code p-1.5 w-2/3 uppercase text-center text-xs h-10">
+                        <button id="btn-recv-lousa" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg w-1/3 text-xs shadow-lg h-10 transition-colors">Buscar</button>
+                    </div>
+                    <div id="recv-lousa-result" class="text-xs"></div>
 
                     <h3 class="font-bold text-sm mt-4">Camadas Detectadas</h3>
                     <div id="magic-layers-list" class="flex flex-col gap-2 overflow-y-auto max-h-48 text-xs">
@@ -720,9 +756,9 @@
             }
         });
 
-        document.getElementById('btn-download-transfer').addEventListener('click', async () => {
-            const codigo = document.getElementById('transfer-code-input').value.trim().toUpperCase();
-            const resultBox = document.getElementById('download-result');
+        async function handleCloudReceive(codigoInputId, resultBoxId) {
+            const codigo = document.getElementById(codigoInputId).value.trim().toUpperCase();
+            const resultBox = document.getElementById(resultBoxId);
             
             if (!codigo) { resultBox.innerHTML = '<span class="text-error">Digite um código.</span>'; return; }
             resultBox.innerHTML = '<span class="text-info animate-pulse">Buscando na nuvem...</span>';
@@ -739,22 +775,30 @@
                     extraHtml = `<button onclick="carregarTextoDaNuvem('${escapeAttribute(signedData.signedUrl)}')" class="w-full mt-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg transition shadow-lg text-sm">📖 Abrir no Painel de Texto</button>`;
                 } else if (data.file_type === 'application/json' && data.file_name.endsWith('_canvas.json')) {
                     extraHtml = `<button onclick="carregarLousaDaNuvem('${escapeAttribute(signedData.signedUrl)}')" class="w-full mt-2 bg-purple-700 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg transition shadow-lg text-sm">🎨 Abrir na Lousa Mágica</button>`;
+                } else if (data.file_name.toLowerCase().endsWith('.svg') || data.file_type.startsWith('image/')) {
+                    extraHtml = `<button onclick="carregarImagemDaNuvemStudio('${escapeAttribute(signedData.signedUrl)}', '${escapeAttribute(data.file_name)}')" class="w-full mt-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg transition shadow-lg text-sm">✨ Abrir no Studio Vetorial</button>`;
                 }
 
                 resultBox.innerHTML = `
                     <div class="mt-4 p-4 bg-slate-800 border border-slate-600 rounded-xl text-left">
-                        <div class="font-bold text-lg mb-1">${escapeHtml(data.file_name)}</div>
+                        <div class="font-bold text-lg mb-1 break-all">${escapeHtml(data.file_name)}</div>
                         <div class="text-xs text-slate-400 mb-4">${formatBytes(data.file_size)}</div>
-                        <button onclick="baixarArquivo('${escapeAttribute(signedData.signedUrl)}', '${escapeAttribute(data.file_name)}')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-4 rounded-lg transition shadow-lg">
-                            ⬇️ Baixar Arquivo Diretamente
+                        <button onclick="baixarArquivo('${escapeAttribute(signedData.signedUrl)}', '${escapeAttribute(data.file_name)}')" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 px-4 rounded-lg transition shadow-lg text-sm">
+                            ⬇️ Baixar Arquivo
                         </button>
                         ${extraHtml}
                     </div>
                 `;
             } catch (err) {
-                resultBox.innerHTML = `<span class="text-error">${err.message}</span>`;
+                resultBox.innerHTML = `<span class="text-error text-sm">${err.message}</span>`;
             }
-        });
+        }
+
+        // Adiciona os eventos para todos os botões de receber da interface
+        document.getElementById('btn-download-transfer').addEventListener('click', () => handleCloudReceive('transfer-code-input', 'download-result'));
+        document.getElementById('btn-recv-text').addEventListener('click', () => handleCloudReceive('text-code-input', 'recv-text-result'));
+        document.getElementById('btn-recv-lousa').addEventListener('click', () => handleCloudReceive('lousa-code-input', 'recv-lousa-result'));
+        document.getElementById('btn-recv-studio').addEventListener('click', () => handleCloudReceive('studio-code-input', 'recv-studio-result'));
 
         // Função genérica de upload para Supabase
         async function uploadGenericToSupabase(blob, fileName, fileType, resultElementId) {
@@ -846,12 +890,27 @@
             MagicCanvas.ctx.lineCap = 'round';
             MagicCanvas.ctx.lineJoin = 'round';
             updateColorHistoryUI();
+            
+            // Reajusta o tamanho sempre que a janela mudar de tamanho
+            window.addEventListener('resize', () => {
+                if (!document.getElementById('transf-mode-canvas').classList.contains('hidden')) {
+                    resizeMagicCanvas();
+                }
+            });
         }
 
         function resizeMagicCanvas() {
-            // Mantém a proporção e resolução interna alta (1080x1920) mas redimensiona CSS
+            // Faz o canvas preencher 100% do contêiner sem distorcer os traços
             const container = document.getElementById('magic-canvas-container');
-            // A resolução interna permanece 1080x1920 para bater com o Auto.js
+            if (container && container.clientWidth > 0) {
+                MagicCanvas.el.width = container.clientWidth;
+                MagicCanvas.el.height = container.clientHeight;
+                
+                // É necessário reatribuir o estilo da linha sempre que o width/height muda
+                MagicCanvas.ctx.lineCap = 'round';
+                MagicCanvas.ctx.lineJoin = 'round';
+                redrawMagicCanvas();
+            }
         }
 
         // --- Interações de Ferramentas ---
@@ -892,12 +951,24 @@
 
         // --- Eventos de Mouse/Touch ---
         function getMousePos(e) {
-            const rect = MagicCanvas.el.getBoundingClientRect();
-            const scaleX = MagicCanvas.el.width / rect.width;
-            const scaleY = MagicCanvas.el.height / rect.height;
+            const canvas = MagicCanvas.el;
+            const rect = canvas.getBoundingClientRect();
+            
             let cx = e.clientX, cy = e.clientY;
-            if(e.touches && e.touches.length > 0) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
-            return { x: (cx - rect.left) * scaleX, y: (cy - rect.top) * scaleY };
+            if (e.touches && e.touches.length > 0) { 
+                cx = e.touches[0].clientX; 
+                cy = e.touches[0].clientY; 
+            }
+
+            // Escala direta porque o tamanho do canvas na tela agora é idêntico
+            // à sua proporção nativa, graças ao display flex e aspect-ratio
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            return { 
+                x: (cx - rect.left) * scaleX, 
+                y: (cy - rect.top) * scaleY 
+            };
         }
 
         MagicCanvas.el.addEventListener('mousedown', startMagicDraw);
@@ -990,7 +1061,7 @@
                 }
                 else if (item.type === 'heart') {
                     const w = Math.abs(item.end.x - item.start.x) * 2; const h = Math.abs(item.end.y - item.start.y) * 2;
-                    drawHeart(ctx, x, y, w, h);
+                    drawHeart(ctx, item.start.x, item.start.y, w, h);
                 }
             });
         }
@@ -1150,6 +1221,27 @@
                 showToast("Erro ao ler o desenho: " + e.message, true);
             } finally {
                 hideLoader();
+            }
+        }
+
+        async function carregarImagemDaNuvemStudio(url, filename) {
+            try {
+                showLoader("Carregando do Servidor", "Obtendo arquivo...");
+                const response = await fetch(url);
+                const blob = await response.blob();
+                
+                // Precisamos criar um objeto 'File' simulado para passar para o vetorizador (handleSmartInput)
+                const file = new File([blob], filename, { type: blob.type });
+                
+                D.tabs[0].click(); // Alterna para a aba Studio Vetorial
+                hideLoader();
+                
+                // Passa como array, igual como se tivesse arrastado
+                handleSmartInput([file]); 
+                showToast("Arquivo carregado no Studio!");
+            } catch (e) {
+                hideLoader();
+                showToast("Erro ao ler o arquivo: " + e.message, true);
             }
         }
 
@@ -1447,6 +1539,8 @@
         function updateCanvasDims() {
             State.screenW = parseInt(D.screenW.value) || 1080;
             State.screenH = parseInt(D.screenH.value) || 1920;
+            
+            // Atualiza Studio Vetorial
             D.canvas.width = State.screenW; 
             D.canvas.height = State.screenH;
             D.canvas.style.aspectRatio = `${State.screenW} / ${State.screenH}`;
@@ -1678,14 +1772,12 @@
             const doFill = (layer.drawMode === 'hachura' || layer.drawMode === 'completo');
             const doStroke = (layer.drawMode === 'contorno' || layer.drawMode === 'completo');
             
-            // É importante definir isso fora para que o doStroke também possa usar
-            const tempSvg = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
-            
             // Hachura (Matemática Otimizada com Step e Intersection)
             if (doFill) {
                 const offCanvas = document.createElement('canvas');
                 offCanvas.width = Math.round(State.svgNativeW); offCanvas.height = Math.round(State.svgNativeH);
                 const offCtx = offCanvas.getContext('2d');
+                const tempSvg = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
 
                 for (let j = 0; j < layer.paths.length; j++) {
                     const path = layer.paths[j]; const d = path.getAttribute('d'); if(!d) continue;
@@ -1733,56 +1825,29 @@
                 }
             }
 
-            // Contorno (Linha Interpolada de Alta Fidelidade)
+            // Contorno (Linha Interpolada)
             if (doStroke) {
-                const stepLen = 0.5; // Fixo para Máxima Precisão (Como solicitado)
-                const domPoint = tempSvg.createSVGPoint();
-
+                const stepLen = Math.max(1, resolution / 2.0);
                 for (let j = 0; j < layer.paths.length; j++) {
-                    const path = layer.paths[j]; 
-                    const ctm = path.getCTM(); 
-                    if (!ctm) continue;
-                    
-                    let tLen = 0; 
-                    try { tLen = path.getTotalLength(); } catch(e) { continue; }
-                    if (tLen <= 0) continue;
-                    
-                    let currentBlock = [];
-                    let lastRawPt = null;
-                    
-                    for (let l = 0; l <= tLen; l += stepLen) {
-                        let rawPt = path.getPointAtLength(l);
-                        
-                        // Sistema de Detecção de Salto (Gap) 
-                        if (lastRawPt) {
-                            let svgDist = Math.hypot(rawPt.x - lastRawPt.x, rawPt.y - lastRawPt.y);
-                            if (svgDist > stepLen * 4) {
-                                if (currentBlock.length > 1) traces.push(currentBlock);
-                                currentBlock = [];
-                            }
-                        }
-
-                        domPoint.x = rawPt.x;
-                        domPoint.y = rawPt.y;
-                        let matrixPt = domPoint.matrixTransform(ctm);
-                        
-                        let fX = Math.round((matrixPt.x * State.svgScale) + State.svgOffsetX);
-                        let fY = Math.round((matrixPt.y * State.svgScale) + State.svgOffsetY);
+                    const path = layer.paths[j]; const ctm = path.getCTM(); if(!ctm) continue;
+                    let tLen = 0; try{ tLen = path.getTotalLength(); }catch(e){ continue; }
+                    if(tLen<=0) continue;
+                    let pts = [];
+                    for (let l=0; l<=tLen; l+=stepLen) {
+                        const pt = path.getPointAtLength(l).matrixTransform(ctm);
+                        let fX = Math.round((pt.x*State.svgScale)+State.svgOffsetX);
+                        let fY = Math.round((pt.y*State.svgScale)+State.svgOffsetY);
                         if(State.flipYAxis) fY = State.screenH - fY;
-                        
-                        currentBlock.push(`[${fX}, ${fY}]`);
-                        lastRawPt = rawPt;
+                        pts.push(`[${fX}, ${fY}]`);
                     }
-                    
-                    if (currentBlock.length > 1) {
+                    if(pts.length>=2) {
                         const MAX = 5000;
-                        for(let c = 0; c < currentBlock.length; c += MAX) {
-                            let chunk = currentBlock.slice(c, c + MAX + 1);
-                            if(chunk.length >= 2) traces.push(chunk);
+                        for(let c=0; c<pts.length; c+=MAX) {
+                            let chunk = pts.slice(c, c+MAX+1);
+                            if(chunk.length>=2) traces.push(chunk);
                         }
                     }
-                    
-                    if (j % 5 === 0) await new Promise(r => setTimeout(r, 5));
+                    if(j%5===0) await new Promise(r=>setTimeout(r,5));
                 }
             }
 
@@ -1892,30 +1957,33 @@
             }
         }
 
-        D.btnGenZip.addEventListener('click', async () => {
-            if (!State.currentSvgElement) return;
+        async function generateZipBlobForStudio() {
+            if (!State.currentSvgElement) throw new Error("Sem imagem carregada.");
             const res = parseFloat(D.resInput.value) || 1;
             const visLayers = State.extractedLayers.filter(l => l.visible);
-            if(visLayers.length === 0) { showToast('Nenhuma camada visível', true); return; }
+            if(visLayers.length === 0) throw new Error("Nenhuma camada visível");
 
+            const zip = new JSZip();
+            for (let i = 0; i < visLayers.length; i++) {
+                const layer = visLayers[i];
+                const order = State.extractedLayers.indexOf(layer) + 1;
+                updateLoader(((i+1)/visLayers.length)*90, `Criando script para ${layer.colorName}...`);
+                
+                await new Promise(r => setTimeout(r, 40));
+                const script = await buildScriptString(layer, order, Math.max(1, res));
+                const safeName = layer.colorName.replace(/[^a-zA-Z0-9]/g, '_');
+                zip.file(`${order}_${safeName}.js`, script);
+            }
+            updateLoader(95, "Compactando arquivos...");
+            return await zip.generateAsync({type:"blob"});
+        }
+
+        D.btnGenZip.addEventListener('click', async () => {
             D.btnGenZip.disabled = true;
             showLoader("Gerando ZIP", "Iniciando processamento...");
 
             try {
-                const zip = new JSZip();
-                for (let i = 0; i < visLayers.length; i++) {
-                    const layer = visLayers[i];
-                    const order = State.extractedLayers.indexOf(layer) + 1;
-                    updateLoader(((i+1)/visLayers.length)*90, `Criando script para ${layer.colorName}...`);
-                    
-                    await new Promise(r => setTimeout(r, 40));
-                    const script = await buildScriptString(layer, order, Math.max(1, res));
-                    const safeName = layer.colorName.replace(/[^a-zA-Z0-9]/g, '_');
-                    zip.file(`${order}_${safeName}.js`, script);
-                }
-                
-                updateLoader(95, "Compactando arquivos...");
-                const blob = await zip.generateAsync({type:"blob"});
+                const blob = await generateZipBlobForStudio();
                 
                 let zipName = D.zipFilename.value.trim() || "Scripts";
                 if (!zipName.toLowerCase().endsWith('.zip')) zipName += '.zip';
@@ -1926,18 +1994,30 @@
 
                 hideLoader();
                 showToast('ZIP gerado com sucesso!');
-                
-                // Opção inteligente: Sugerir transferência
-                setTimeout(() => {
-                    if (confirm("ZIP baixado! Deseja ir para a aba de Transferência para enviá-lo para o celular via Nuvem?")) {
-                        D.tabs[1].click(); // Abre Aba de Transferência
-                    }
-                }, 1000);
 
             } catch(e) {
                 hideLoader(); showToast('Erro: ' + e.message, true);
             } finally {
                 D.btnGenZip.disabled = false;
+            }
+        });
+
+        document.getElementById('btn-send-zip').addEventListener('click', async () => {
+            document.getElementById('btn-send-zip').disabled = true;
+            showLoader("Preparando ZIP", "Compactando antes de enviar...");
+
+            try {
+                const blob = await generateZipBlobForStudio();
+                hideLoader();
+                
+                let zipName = D.zipFilename.value.trim() || "Scripts";
+                if (!zipName.toLowerCase().endsWith('.zip')) zipName += '.zip';
+                
+                await uploadGenericToSupabase(blob, zipName, 'application/zip', 'zip-upload-result');
+            } catch(e) {
+                hideLoader(); showToast('Erro: ' + e.message, true);
+            } finally {
+                document.getElementById('btn-send-zip').disabled = false;
             }
         });
 
