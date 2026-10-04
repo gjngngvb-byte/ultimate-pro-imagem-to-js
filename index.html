@@ -916,7 +916,6 @@
             const longUrl = document.getElementById('link-long-input').value.trim();
             if (!longUrl) { showToast('Cole um link primeiro!', true); return; }
             
-            // Corrige links sem http/https nativo
             let finalUrl = longUrl;
             if (!/^https?:\/\//i.test(finalUrl)) {
                 finalUrl = 'https://' + finalUrl;
@@ -928,11 +927,9 @@
             btn.disabled = true;
 
             try {
-                // Gera um alias único começando com "uny" para garantir sucesso na API
                 const randomSuffix = Math.random().toString(36).substring(2, 8);
                 const customAlias = 'uny' + randomSuffix;
 
-                // Usando a API direta do spoo.me que suporta CORS nativamente
                 const response = await fetch('https://spoo.me/', {
                     method: 'POST',
                     headers: {
@@ -950,7 +947,6 @@
                     throw new Error(data.message || 'Não foi possível encurtar o link.');
                 }
 
-                // Renderiza Resultados
                 const shortUrl = data.short_url;
                 const resultDiv = document.getElementById('link-result');
                 const output = document.getElementById('link-short-output');
@@ -960,7 +956,6 @@
                 resultDiv.classList.remove('hidden');
                 resultDiv.classList.add('flex');
                 
-                // Gera o QR Code com densidade reduzida (pontos maiores)
                 qrContainer.innerHTML = '';
                 new QRCode(qrContainer, {
                     text: shortUrl,
