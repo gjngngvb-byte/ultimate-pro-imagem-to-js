@@ -516,22 +516,22 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- ABA 3: HISTÓRICO LOCAL                     -->
+        <!-- ABA 3: HISTÓRICO NO SERVIDOR               -->
         <!-- ========================================== -->
         <section id="tab-history" class="hidden animate-fade-in flex flex-col gap-6 max-w-7xl mx-auto w-full">
             <div class="glass-panel p-6 sm:p-8 flex flex-col gap-4 min-h-[60vh]">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700 pb-4">
                     <div>
-                        <h2 class="text-xl font-bold flex items-center gap-2"><span class="text-2xl">🕒</span> Histórico Local</h2>
-                        <p class="text-sm text-slate-400 mt-1">Seus últimos envios e links gerados neste dispositivo.</p>
+                        <h2 class="text-xl font-bold flex items-center gap-2"><span class="text-2xl">🕒</span> Histórico no Servidor</h2>
+                        <p class="text-sm text-slate-400 mt-1">Seus envios, links e códigos armazenados na nuvem (Supabase).</p>
                     </div>
-                    <button id="btn-clear-history" class="text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors border border-red-500/30 px-4 py-2 rounded-lg font-bold">
-                        Limpar Histórico
+                    <button id="btn-refresh-history" class="text-xs text-purple-300 hover:text-white bg-purple-900/40 hover:bg-purple-800 transition-colors border border-purple-500/40 px-4 py-2 rounded-lg font-bold flex items-center gap-1.5">
+                        🔄 Atualizar Lista
                     </button>
                 </div>
                 
                 <div id="history-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pr-2 max-h-[600px]">
-                    <!-- Itens renderizados dinamicamente pelo JS -->
+                    <!-- Itens carregados dinamicamente do servidor -->
                 </div>
             </div>
         </section>
@@ -694,6 +694,10 @@
                 D.tabTransfer.classList.add('hidden');
                 D.tabHistory.classList.add('hidden');
                 document.getElementById(target).classList.remove('hidden');
+
+                if (target === 'tab-history') {
+                    renderHistoryFromServer();
+                }
             });
         });
 
@@ -717,84 +721,90 @@
             }
         } catch (e) { console.warn("Supabase não pôde ser inicializado:", e); }
 
-        // --- SISTEMA DE HISTÓRICO LOCAL ---
-        function saveToHistory(item) {
-            let history = JSON.parse(localStorage.getItem('uny_history') || '[]');
-            history.unshift(item);
-            if (history.length > 50) history.pop(); // Mantém apenas os 50 mais recentes
-            localStorage.setItem('uny_history', JSON.stringify(history));
-            renderHistory();
-        }
-
-        function renderHistory() {
+        // --- SISTEMA DE HISTÓRICO NO SERVIDOR (SUPABASE) ---
+        async function renderHistoryFromServer() {
             const list = document.getElementById('history-list');
-            let history = JSON.parse(localStorage.getItem('uny_history') || '[]');
-            list.innerHTML = '';
+            list.innerHTML = '<div class="col-span-full text-center text-slate-400 py-10 animate-pulse">Carregando histórico do servidor...</div>';
             
-            if (history.length === 0) {
-                list.innerHTML = '<div class="col-span-full text-center text-slate-500 py-10 italic">Nenhum histórico encontrado.</div>';
+            if (!supabaseClient) {
+                list.innerHTML = '<div class="col-span-full text-center text-red-400 py-10">Conexão com o Supabase indisponível.</div>';
                 return;
             }
 
-            history.forEach((item, index) => {
-                const qrId = 'hist-qr-' + index + '-' + Date.now();
-                const card = document.createElement('div');
-                card.className = 'bg-slate-900/60 border border-slate-700 hover:border-slate-500 transition-colors rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden group';
-                
-                let icon = '📄';
-                if(item.type === 'link') icon = '🔗';
-                else if(item.type === 'canvas') icon = '🎨';
-                else if(item.type === 'text') icon = '📝';
-                else if(item.type === 'file' && item.name.endsWith('.zip')) icon = '📦';
-                else if(item.type === 'file' && (item.name.endsWith('.svg') || item.name.match(/\.(png|jpg|jpeg)$/i))) icon = '🖼️';
+            try {
+                const { data, error } = await supabaseClient
+                    .from("transfers")
+                    .select("*")
+                    .order("created_at", { ascending: false })
+                    .limit(50);
 
-                card.innerHTML = `
-                    <div class="flex items-start justify-between gap-2 border-b border-slate-700/50 pb-2">
-                        <div class="flex items-center gap-3 overflow-hidden">
-                            <span class="text-2xl bg-slate-800 p-2 rounded-lg">${icon}</span>
-                            <div class="flex flex-col overflow-hidden">
-                                <span class="font-bold text-sm text-white truncate w-full pr-2" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
-                                <span class="text-[10px] text-slate-400">${new Date(item.date).toLocaleString()}</span>
-                            </div>
-                        </div>
-                    </div>
+                if (error) throw error;
+                list.innerHTML = '';
+
+                if (!data || data.length === 0) {
+                    list.innerHTML = '<div class="col-span-full text-center text-slate-500 py-10 italic">Nenhum registro encontrado no servidor.</div>';
+                    return;
+                }
+
+                data.forEach((item, index) => {
+                    const qrId = 'hist-qr-' + index + '-' + Date.now();
+                    const card = document.createElement('div');
+                    card.className = 'bg-slate-900/60 border border-slate-700 hover:border-slate-500 transition-colors rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden group';
                     
-                    <div class="flex items-center gap-4 pt-1">
-                        <div id="${qrId}" class="bg-white p-1 rounded-lg shadow-sm flex-shrink-0"></div>
-                        <div class="flex flex-col gap-2 w-full overflow-hidden">
-                            ${item.code ? `
-                            <div>
-                                <span class="text-[9px] text-slate-400 uppercase tracking-wider block mb-0.5">CÓDIGO (Celular)</span>
-                                <div class="bg-black/40 px-2 py-1.5 rounded text-white font-mono text-xs cursor-pointer hover:bg-black/60 truncate transition-colors border border-transparent hover:border-slate-700" onclick="navigator.clipboard.writeText('${item.code}'); showToast('Código copiado!')" title="Copiar código">${item.code}</div>
-                            </div>` : ''}
-                            <div>
-                                <span class="text-[9px] text-slate-400 uppercase tracking-wider block mb-0.5">LINK CURTO DIRETO</span>
-                                <div class="bg-emerald-900/20 px-2 py-1.5 rounded text-emerald-400 font-mono text-xs cursor-pointer hover:bg-emerald-900/40 truncate transition-colors border border-transparent hover:border-emerald-700/50" onclick="navigator.clipboard.writeText('${item.link}'); showToast('Link copiado!')" title="Copiar link">${item.link}</div>
+                    let icon = '📄';
+                    const name = item.file_name || 'Item sem nome';
+                    const code = item.code || '';
+                    const pageUrl = window.location.origin + window.location.pathname + "?code=" + code;
+                    
+                    if (name.endsWith('.zip')) icon = '📦';
+                    else if (name.endsWith('_transfer.txt')) icon = '📝';
+                    else if (name.endsWith('_canvas.json')) icon = '🎨';
+                    else if (name.match(/\.(svg|png|jpg|jpeg)$/i)) icon = '🖼️';
+
+                    card.innerHTML = `
+                        <div class="flex items-start justify-between gap-2 border-b border-slate-700/50 pb-2">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <span class="text-2xl bg-slate-800 p-2 rounded-lg">${icon}</span>
+                                <div class="flex flex-col overflow-hidden">
+                                    <span class="font-bold text-sm text-white truncate w-full pr-2" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+                                    <span class="text-[10px] text-slate-400">${item.created_at ? new Date(item.created_at).toLocaleString() : 'Recente'}</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
-                list.appendChild(card);
-                
-                // Gera o QRCode com pequeno atraso para o DOM renderizar
-                setTimeout(() => {
-                    new QRCode(document.getElementById(qrId), {
-                        text: item.link, width: 68, height: 68, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
-                    });
-                }, 10);
-            });
+                        
+                        <div class="flex items-center gap-4 pt-1">
+                            <div id="${qrId}" class="bg-white p-1 rounded-lg shadow-sm flex-shrink-0"></div>
+                            <div class="flex flex-col gap-2 w-full overflow-hidden">
+                                ${code ? `
+                                <div>
+                                    <span class="text-[9px] text-slate-400 uppercase tracking-wider block mb-0.5">CÓDIGO (Celular)</span>
+                                    <div class="bg-black/40 px-2 py-1.5 rounded text-white font-mono text-xs cursor-pointer hover:bg-black/60 truncate transition-colors border border-transparent hover:border-slate-700" onclick="navigator.clipboard.writeText('${code}'); showToast('Código copiado!')" title="Copiar código">${code}</div>
+                                </div>` : ''}
+                                <div>
+                                    <span class="text-[9px] text-slate-400 uppercase tracking-wider block mb-0.5">LINK DIRETO</span>
+                                    <div class="bg-emerald-900/20 px-2 py-1.5 rounded text-emerald-400 font-mono text-xs cursor-pointer hover:bg-emerald-900/40 truncate transition-colors border border-transparent hover:border-emerald-700/50" onclick="navigator.clipboard.writeText('${pageUrl}'); showToast('Link copiado!')" title="Copiar link">${pageUrl}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                    
+                    setTimeout(() => {
+                        const qrElem = document.getElementById(qrId);
+                        if(qrElem) {
+                            new QRCode(qrElem, {
+                                text: pageUrl, width: 68, height: 68, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+                            });
+                        }
+                    }, 10);
+                });
+
+            } catch (err) {
+                list.innerHTML = `<div class="col-span-full text-center text-red-400 py-10">Erro ao carregar do servidor: ${err.message}</div>`;
+            }
         }
 
-        document.getElementById('btn-clear-history').addEventListener('click', () => {
-            if(confirm('Tem certeza que deseja limpar todo o histórico armazenado neste navegador?')) {
-                localStorage.removeItem('uny_history');
-                renderHistory();
-                showToast('Histórico limpo com sucesso!');
-            }
-        });
-
-        // Inicializa o Histórico ao carregar
-        document.addEventListener('DOMContentLoaded', renderHistory);
+        document.getElementById('btn-refresh-history').addEventListener('click', renderHistoryFromServer);
 
 
         // --- NAVEGAÇÃO DE SUB-ABAS (TRANSFERÊNCIA) ---
@@ -819,7 +829,7 @@
         });
 
         // ==========================================
-        // LÓGICA DE TRANSFERÊNCIA DE ARQUIVOS (EXISTENTE MODIFICADA)
+        // LÓGICA DE TRANSFERÊNCIA DE ARQUIVOS
         // ==========================================
         let selectedTransferFile = null;
 
@@ -889,15 +899,6 @@
                     }
                 } catch(e) {}
 
-                // SALVA NO HISTÓRICO LOCAL
-                saveToHistory({
-                    type: 'file',
-                    name: selectedTransferFile.name,
-                    code: codigo,
-                    link: shortUrl,
-                    date: Date.now()
-                });
-
                 resultBox.innerHTML = `
                     <div class="mt-4 p-4 bg-emerald-900/30 border border-emerald-500/50 rounded-xl flex flex-col items-center text-center">
                         <div class="text-emerald-400 font-bold mb-2">✓ Arquivo Enviado!</div>
@@ -966,13 +967,11 @@
             }
         }
 
-        // Adiciona os eventos para todos os botões de receber da interface
         document.getElementById('btn-download-transfer').addEventListener('click', () => handleCloudReceive('transfer-code-input', 'download-result'));
         document.getElementById('btn-recv-text').addEventListener('click', () => handleCloudReceive('text-code-input', 'recv-text-result'));
         document.getElementById('btn-recv-lousa').addEventListener('click', () => handleCloudReceive('lousa-code-input', 'recv-lousa-result'));
         document.getElementById('btn-recv-studio').addEventListener('click', () => handleCloudReceive('studio-code-input', 'recv-studio-result'));
 
-        // Função genérica de upload para Supabase
         async function uploadGenericToSupabase(blob, fileName, fileType, resultElementId) {
             const resultBox = document.getElementById(resultElementId);
             if (!supabaseClient) { resultBox.innerHTML = '<span class="text-error">Sem conexão com a nuvem.</span>'; return; }
@@ -1016,19 +1015,6 @@
                         shortUrl = data.short_url;
                     }
                 } catch(e) {}
-
-                // SALVA NO HISTÓRICO LOCAL
-                let historyType = 'file';
-                if (fileName.endsWith('_transfer.txt')) historyType = 'text';
-                else if (fileName.endsWith('_canvas.json')) historyType = 'canvas';
-                
-                saveToHistory({
-                    type: historyType,
-                    name: fileName,
-                    code: codigo,
-                    link: shortUrl,
-                    date: Date.now()
-                });
 
                 const qrContainerId = "qr-" + codigo;
 
@@ -1147,15 +1133,6 @@
                     colorLight: "#ffffff",
                     correctLevel: QRCode.CorrectLevel.L
                 });
-                
-                // SALVA NO HISTÓRICO LOCAL
-                saveToHistory({
-                    type: 'link',
-                    name: finalUrl,
-                    code: null,
-                    link: shortUrl,
-                    date: Date.now()
-                });
 
                 showToast('Link encurtado e QR Code gerado!');
 
@@ -1179,9 +1156,9 @@
         const MagicCanvas = {
             el: document.getElementById('magic-canvas'),
             ctx: document.getElementById('magic-canvas').getContext('2d'),
-            drawings: [], // { type, color, size, points, layerId }
+            drawings: [], 
             redoStack: [],
-            layersInfo: {}, // { id: { name, color, visible } }
+            layersInfo: {}, 
             tool: 'brush',
             color: '#000000',
             size: 5,
@@ -1197,7 +1174,6 @@
             MagicCanvas.ctx.lineJoin = 'round';
             updateColorHistoryUI();
             
-            // Reajusta o tamanho sempre que a janela mudar de tamanho
             window.addEventListener('resize', () => {
                 if (!document.getElementById('transf-mode-canvas').classList.contains('hidden')) {
                     resizeMagicCanvas();
@@ -1206,7 +1182,6 @@
         }
 
         function resizeMagicCanvas() {
-            // Faz o canvas preencher 100% do contêiner sem distorcer os traços
             const container = document.getElementById('magic-canvas-container');
             if (container && container.clientWidth > 0) {
                 MagicCanvas.el.width = container.clientWidth;
@@ -1218,7 +1193,6 @@
             }
         }
 
-        // --- Interações de Ferramentas ---
         document.querySelectorAll('.canvas-toolbar-btn[data-tool]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.canvas-toolbar-btn[data-tool]').forEach(b => b.classList.remove('active'));
@@ -1254,7 +1228,6 @@
             });
         }
 
-        // --- Eventos de Mouse/Touch ---
         function getMousePos(e) {
             const canvas = MagicCanvas.el;
             const rect = canvas.getBoundingClientRect();
@@ -1321,7 +1294,6 @@
             redrawMagicCanvas();
         }
 
-        // --- Renderização do Canvas ---
         function redrawMagicCanvas() {
             const ctx = MagicCanvas.ctx;
             ctx.fillStyle = '#ffffff';
@@ -1387,7 +1359,6 @@
             ctx.closePath(); ctx.stroke(); ctx.restore();
         }
 
-        // --- Controles de Histórico ---
         document.getElementById('btn-magic-undo').addEventListener('click', () => {
             if(MagicCanvas.drawings.length > 0) {
                 MagicCanvas.redoStack.push(MagicCanvas.drawings.pop()); redrawMagicCanvas();
@@ -1405,7 +1376,6 @@
             }
         });
 
-        // --- Importar JS e Traduzir para Desenho ---
         document.getElementById('magic-import-js').addEventListener('change', (e) => {
             const file = e.target.files[0]; if(!file) return;
             const reader = new FileReader();
@@ -1487,7 +1457,6 @@
             if(MagicCanvas.layersInfo[id]) { MagicCanvas.layersInfo[id].visible = isVis; redrawMagicCanvas(); }
         }
 
-        // --- Enviar e Receber Canvas pela Nuvem ---
         document.getElementById('btn-magic-send').addEventListener('click', () => {
             if (MagicCanvas.drawings.length === 0) { showToast('A lousa está vazia!', true); return; }
             
@@ -1577,7 +1546,6 @@
             setTimeout(() => document.getElementById('btn-download-transfer').click(), 500);
         }
 
-        // Eventos do Smart Dropzone
         D.dropzone.addEventListener('click', () => D.fileInput.click());
         D.fileInput.addEventListener('change', (e) => handleSmartInput(e.target.files));
         D.dropzone.addEventListener('dragover', (e) => { e.preventDefault(); D.dropzone.classList.add('dragover'); });
@@ -1634,7 +1602,6 @@
             }
         }
 
-        // Eventos do Vetorizador
         D.colorSlider.addEventListener('input', e => D.colorVal.textContent = e.target.value);
         
         D.btnProcessVec.addEventListener('click', async () => {
@@ -1785,7 +1752,6 @@
             return closest;
         }
 
-        // --- Workspace Canvas Logic ---
         function initWorkspaceView() {
             updateCanvasDims();
             if (!State.currentSvgElement) return;
@@ -2008,7 +1974,6 @@
             renderLayersUI(); drawCanvasPreview();
         });
 
-        // Merge Logic
         D.btnMerge.addEventListener('click', () => {
             if(State.selectedLayerIdsForMerge.size < 2) return;
             D.mergeChoices.innerHTML = '';
@@ -2139,11 +2104,9 @@
             s += `    if(pts.length < 2) return;\n`;
             s += `    var dur = 0;\n`;
             s += `    if (customMult) {\n`;
-            s += `        // Se o usuario digitou um tempo, ignora os limites padrao e usa a exatidao matematica\n`;
             s += `        dur = Math.floor(pts.length * 10 * customMult);\n`;
-            s += `        if(dur < 10) dur = 10; // prevencao contra gesto instataneo (0ms)\n`;
+            s += `        if(dur < 10) dur = 10;\n`;
             s += `    } else {\n`;
-            s += `        // Comportamento original com os "clamps" de limitacao\n`;
             s += `        dur = Math.floor(Math.max(100, pts.length * 10) * MULTIPLICADOR);\n`;
             s += `        if(dur < Math.max(80, pts.length * 5)) dur = Math.max(80, pts.length * 5);\n`;
             s += `        if(dur > 60000) dur = 60000;\n`;
@@ -2178,7 +2141,6 @@
             s += `    if (cmd.del > 0) { toast("Espere " + (cmd.del/1000) + "s: " + cmd.nome); sleep(cmd.del); }\n`;
             s += `    else { toast("A desenhar: " + cmd.nome); }\n`;
             s += `    \n`;
-            s += `    // Calcula o multiplicador exato se o usuario definiu o tempo em segundos\n`;
             s += `    var currentMult = null;\n`;
             s += `    if (cmd.targetTime > 0) {\n`;
             s += `        var totalPts = 0;\n`;
