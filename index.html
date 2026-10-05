@@ -179,9 +179,10 @@
                     <p class="text-[10px] text-slate-400 uppercase tracking-widest font-semibold mt-1">Smart Studio & Nuvem</p>
                 </div>
             </div>
-            <nav class="flex gap-6 text-sm text-slate-400 font-medium">
+            <nav class="flex gap-4 sm:gap-6 text-xs sm:text-sm text-slate-400 font-medium">
                 <button class="tab-btn active" data-target="tab-studio">Studio Vetorial</button>
                 <button class="tab-btn" data-target="tab-transfer">Nuvem (Transferir)</button>
+                <button class="tab-btn" data-target="tab-history">Histórico</button>
             </nav>
         </div>
     </header>
@@ -514,6 +515,27 @@
 
         </section>
 
+        <!-- ========================================== -->
+        <!-- ABA 3: HISTÓRICO LOCAL                     -->
+        <!-- ========================================== -->
+        <section id="tab-history" class="hidden animate-fade-in flex flex-col gap-6 max-w-7xl mx-auto w-full">
+            <div class="glass-panel p-6 sm:p-8 flex flex-col gap-4 min-h-[60vh]">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700 pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold flex items-center gap-2"><span class="text-2xl">🕒</span> Histórico Local</h2>
+                        <p class="text-sm text-slate-400 mt-1">Seus últimos envios e links gerados neste dispositivo.</p>
+                    </div>
+                    <button id="btn-clear-history" class="text-xs text-red-400 hover:text-red-300 hover:bg-red-900/20 transition-colors border border-red-500/30 px-4 py-2 rounded-lg font-bold">
+                        Limpar Histórico
+                    </button>
+                </div>
+                
+                <div id="history-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pr-2 max-h-[600px]">
+                    <!-- Itens renderizados dinamicamente pelo JS -->
+                </div>
+            </div>
+        </section>
+
     </main>
 
     <!-- Overlay de Carregamento Global -->
@@ -551,7 +573,6 @@
     </div>
 
     <script>
-        
         // ---- ESTADOS E VARIÁVEIS GLOBAIS ----
         const State = {
             imageData: null,
@@ -593,6 +614,7 @@
             tabs: document.querySelectorAll('.tab-btn'),
             tabStudio: document.getElementById('tab-studio'),
             tabTransfer: document.getElementById('tab-transfer'),
+            tabHistory: document.getElementById('tab-history'),
             
             dropzone: document.getElementById('smart-dropzone'),
             fileInput: document.getElementById('file-input'),
@@ -670,11 +692,12 @@
                 const target = tab.getAttribute('data-target');
                 D.tabStudio.classList.add('hidden');
                 D.tabTransfer.classList.add('hidden');
+                D.tabHistory.classList.add('hidden');
                 document.getElementById(target).classList.remove('hidden');
             });
         });
 
-        // Polyfill para UUID (Evita travamentos de segurança ao usar offline/file://)
+        // Polyfill para UUID
         function generateUUID() {
             if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -688,12 +711,91 @@
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtcGx3Z3RpemJxem12YWJyYmhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMDI5NzIsImV4cCI6MjEwNTY3ODk3Mn0.1Y23eINegprxaFa-HtttbJZsMgrT-Wmq1heTT54YaCw";
         let supabaseClient = null;
         
-        // Carregamento Seguro (Não quebra o site se estiver offline)
         try {
             if (typeof supabase !== 'undefined') {
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             }
         } catch (e) { console.warn("Supabase não pôde ser inicializado:", e); }
+
+        // --- SISTEMA DE HISTÓRICO LOCAL ---
+        function saveToHistory(item) {
+            let history = JSON.parse(localStorage.getItem('uny_history') || '[]');
+            history.unshift(item);
+            if (history.length > 50) history.pop(); // Mantém apenas os 50 mais recentes
+            localStorage.setItem('uny_history', JSON.stringify(history));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const list = document.getElementById('history-list');
+            let history = JSON.parse(localStorage.getItem('uny_history') || '[]');
+            list.innerHTML = '';
+            
+            if (history.length === 0) {
+                list.innerHTML = '<div class="col-span-full text-center text-slate-500 py-10 italic">Nenhum histórico encontrado.</div>';
+                return;
+            }
+
+            history.forEach((item, index) => {
+                const qrId = 'hist-qr-' + index + '-' + Date.now();
+                const card = document.createElement('div');
+                card.className = 'bg-slate-900/60 border border-slate-700 hover:border-slate-500 transition-colors rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden group';
+                
+                let icon = '📄';
+                if(item.type === 'link') icon = '🔗';
+                else if(item.type === 'canvas') icon = '🎨';
+                else if(item.type === 'text') icon = '📝';
+                else if(item.type === 'file' && item.name.endsWith('.zip')) icon = '📦';
+                else if(item.type === 'file' && (item.name.endsWith('.svg') || item.name.match(/\.(png|jpg|jpeg)$/i))) icon = '🖼️';
+
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-2 border-b border-slate-700/50 pb-2">
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <span class="text-2xl bg-slate-800 p-2 rounded-lg">${icon}</span>
+                            <div class="flex flex-col overflow-hidden">
+                                <span class="font-bold text-sm text-white truncate w-full pr-2" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+                                <span class="text-[10px] text-slate-400">${new Date(item.date).toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-4 pt-1">
+                        <div id="${qrId}" class="bg-white p-1 rounded-lg shadow-sm flex-shrink-0"></div>
+                        <div class="flex flex-col gap-2 w-full overflow-hidden">
+                            ${item.code ? `
+                            <div>
+                                <span class="text-[9px] text-slate-400 uppercase tracking-wider block mb-0.5">CÓDIGO (Celular)</span>
+                                <div class="bg-black/40 px-2 py-1.5 rounded text-white font-mono text-xs cursor-pointer hover:bg-black/60 truncate transition-colors border border-transparent hover:border-slate-700" onclick="navigator.clipboard.writeText('${item.code}'); showToast('Código copiado!')" title="Copiar código">${item.code}</div>
+                            </div>` : ''}
+                            <div>
+                                <span class="text-[9px] text-slate-400 uppercase tracking-wider block mb-0.5">LINK CURTO DIRETO</span>
+                                <div class="bg-emerald-900/20 px-2 py-1.5 rounded text-emerald-400 font-mono text-xs cursor-pointer hover:bg-emerald-900/40 truncate transition-colors border border-transparent hover:border-emerald-700/50" onclick="navigator.clipboard.writeText('${item.link}'); showToast('Link copiado!')" title="Copiar link">${item.link}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(card);
+                
+                // Gera o QRCode com pequeno atraso para o DOM renderizar
+                setTimeout(() => {
+                    new QRCode(document.getElementById(qrId), {
+                        text: item.link, width: 68, height: 68, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L
+                    });
+                }, 10);
+            });
+        }
+
+        document.getElementById('btn-clear-history').addEventListener('click', () => {
+            if(confirm('Tem certeza que deseja limpar todo o histórico armazenado neste navegador?')) {
+                localStorage.removeItem('uny_history');
+                renderHistory();
+                showToast('Histórico limpo com sucesso!');
+            }
+        });
+
+        // Inicializa o Histórico ao carregar
+        document.addEventListener('DOMContentLoaded', renderHistory);
+
 
         // --- NAVEGAÇÃO DE SUB-ABAS (TRANSFERÊNCIA) ---
         const transfTabs = document.querySelectorAll('.transf-tab-btn');
@@ -786,6 +888,15 @@
                         shortUrl = data.short_url;
                     }
                 } catch(e) {}
+
+                // SALVA NO HISTÓRICO LOCAL
+                saveToHistory({
+                    type: 'file',
+                    name: selectedTransferFile.name,
+                    code: codigo,
+                    link: shortUrl,
+                    date: Date.now()
+                });
 
                 resultBox.innerHTML = `
                     <div class="mt-4 p-4 bg-emerald-900/30 border border-emerald-500/50 rounded-xl flex flex-col items-center text-center">
@@ -906,6 +1017,19 @@
                     }
                 } catch(e) {}
 
+                // SALVA NO HISTÓRICO LOCAL
+                let historyType = 'file';
+                if (fileName.endsWith('_transfer.txt')) historyType = 'text';
+                else if (fileName.endsWith('_canvas.json')) historyType = 'canvas';
+                
+                saveToHistory({
+                    type: historyType,
+                    name: fileName,
+                    code: codigo,
+                    link: shortUrl,
+                    date: Date.now()
+                });
+
                 const qrContainerId = "qr-" + codigo;
 
                 resultBox.innerHTML = `
@@ -959,7 +1083,7 @@
                 const response = await fetch(url);
                 const text = await response.text();
                 document.getElementById('transfer-text-output').value = text;
-                document.querySelector('.transf-tab-btn[data-mode="text"]').click(); // Vai pra aba de texto
+                document.querySelector('.transf-tab-btn[data-mode="text"]').click(); 
                 hideLoader();
                 showToast("Texto carregado com sucesso!");
             } catch (e) {
@@ -1024,6 +1148,15 @@
                     correctLevel: QRCode.CorrectLevel.L
                 });
                 
+                // SALVA NO HISTÓRICO LOCAL
+                saveToHistory({
+                    type: 'link',
+                    name: finalUrl,
+                    code: null,
+                    link: shortUrl,
+                    date: Date.now()
+                });
+
                 showToast('Link encurtado e QR Code gerado!');
 
             } catch (err) {
@@ -1079,7 +1212,6 @@
                 MagicCanvas.el.width = container.clientWidth;
                 MagicCanvas.el.height = container.clientHeight;
                 
-                // É necessário reatribuir o estilo da linha sempre que o width/height muda
                 MagicCanvas.ctx.lineCap = 'round';
                 MagicCanvas.ctx.lineJoin = 'round';
                 redrawMagicCanvas();
@@ -1133,8 +1265,6 @@
                 cy = e.touches[0].clientY; 
             }
 
-            // Escala direta porque o tamanho do canvas na tela agora é idêntico
-            // à sua proporção nativa, graças ao display flex e aspect-ratio
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
 
@@ -1160,7 +1290,7 @@
             if (MagicCanvas.tool === 'brush') {
                 MagicCanvas.currentPath = { type: 'path', color: MagicCanvas.color, size: MagicCanvas.size, points: [pos], layerId: 'manual' };
             }
-            MagicCanvas.redoStack = []; // Quebra o histórico de refazer
+            MagicCanvas.redoStack = []; 
         }
 
         function drawMagic(e) {
@@ -1171,7 +1301,6 @@
                 MagicCanvas.currentPath.points.push(pos);
                 redrawMagicCanvas();
             } else {
-                // Primitivos temporários
                 MagicCanvas.tempShape = {
                     type: MagicCanvas.tool, color: MagicCanvas.color, size: MagicCanvas.size,
                     start: {x: MagicCanvas.startX, y: MagicCanvas.startY}, end: pos, layerId: 'manual'
@@ -1203,7 +1332,6 @@
             if (MagicCanvas.tempShape) allItems.push(MagicCanvas.tempShape);
 
             allItems.forEach(item => {
-                // Verifica visibilidade da camada
                 if (item.layerId !== 'manual' && MagicCanvas.layersInfo[item.layerId] && !MagicCanvas.layersInfo[item.layerId].visible) return;
 
                 ctx.strokeStyle = item.color; ctx.fillStyle = item.color;
@@ -1289,7 +1417,6 @@
         });
 
         function parseJsToCanvas(jsText) {
-            // Procura o padrão gerado pelo nosso Studio: { nome: "[NomeCor]...", del: 0, trs: [ ... ] }
             const cmdRegex = /nome:\s*"\[(.*?)\](.*?)",[\s\S]*?trs:\s*\[([\s\S]*?)\]\s*\}/g;
             let match; let layersAdded = 0;
 
@@ -1306,7 +1433,6 @@
                 MagicCanvas.layersInfo[layerId] = { name: colorName, color: hex, visible: true };
 
                 const trsText = match[3];
-                // Extrai arrays de coordenadas [x, y]
                 const traces = trsText.match(/\[\s*(?:\[\s*\d+\s*,\s*\d+\s*\]\s*,?\s*)+\]/g);
                 if (traces) {
                     traces.forEach(traceStr => {
@@ -1385,7 +1511,7 @@
                     MagicCanvas.drawings = json.drawings;
                     MagicCanvas.layersInfo = json.layersInfo || {};
                     MagicCanvas.redoStack = [];
-                    document.querySelector('.transf-tab-btn[data-mode="canvas"]').click(); // Vai pra aba da Lousa
+                    document.querySelector('.transf-tab-btn[data-mode="canvas"]').click(); 
                     updateMagicLayersUI();
                     redrawMagicCanvas();
                     showToast("Desenho carregado com sucesso!");
@@ -1403,13 +1529,11 @@
                 const response = await fetch(url);
                 const blob = await response.blob();
                 
-                // Precisamos criar um objeto 'File' simulado para passar para o vetorizador (handleSmartInput)
                 const file = new File([blob], filename, { type: blob.type });
                 
-                D.tabs[0].click(); // Alterna para a aba Studio Vetorial
+                D.tabs[0].click(); 
                 hideLoader();
                 
-                // Passa como array, igual como se tivesse arrastado
                 handleSmartInput([file]); 
                 showToast("Arquivo carregado no Studio!");
             } catch (e) {
@@ -1418,7 +1542,6 @@
             }
         }
 
-        // Inicializa Canvas
         initMagicCanvas();
 
         async function baixarArquivo(url, fileName) {
@@ -1446,16 +1569,13 @@
         function escapeHtml(t) { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
         function escapeAttribute(t) { return String(t).replace(/\\/g, "\\\\").replace(/'/g, "\\'"); }
 
-        // Checar URL Params para Auto-Load
         const urlParams = new URLSearchParams(window.location.search);
         const autoCode = urlParams.get("code");
         if (autoCode) {
-            D.tabs[1].click(); // Switch to transfer tab
+            D.tabs[1].click(); 
             document.getElementById('transfer-code-input').value = autoCode.toUpperCase();
             setTimeout(() => document.getElementById('btn-download-transfer').click(), 500);
         }
-
-
 
         // Eventos do Smart Dropzone
         D.dropzone.addEventListener('click', () => D.fileInput.click());
@@ -1474,12 +1594,11 @@
             D.zipFilename.value = `${nameWithoutExt}_Scripts`;
 
             if (file.type.startsWith('image/')) {
-                // Rota 1: Raster Image -> Vetorizador
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
                     img.onload = () => {
-                        const maxDim = 800; // Otimização de performance
+                        const maxDim = 800; 
                         let w = img.width, h = img.height;
                         if (w > maxDim || h > maxDim) {
                             const ratio = Math.min(maxDim / w, maxDim / h);
@@ -1503,7 +1622,6 @@
                 reader.readAsDataURL(file);
             } 
             else if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
-                // Rota 2: SVG Nativo -> Workspace Direto
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     D.dropzone.innerHTML = `<p class="text-blue-400 font-bold mb-2">✓ SVG Carregado</p><p class="text-xs text-slate-400">Arraste outro para trocar</p>`;
@@ -1530,7 +1648,6 @@
                     const numColors = parseInt(D.colorSlider.value, 10);
                     const isSmooth = D.smoothToggle.checked;
                     
-                    // Extrai paleta usando a lógica otimizada do SilkVector
                     updateLoader(20, "Extraindo paleta de cores...");
                     const pal = extractCustomPalette(State.imageData, numColors);
                     
@@ -1584,8 +1701,6 @@
             return palette;
         }
 
-
-        
         function processSVGToLayers(svgString) {
             const parser = new DOMParser();
             const doc = parser.parseFromString(svgString, "image/svg+xml");
@@ -1593,7 +1708,6 @@
             
             if (!svgEl) { showToast("SVG inválido", true); return; }
 
-            // Normaliza Dimensões com Prevenção de Erros
             let vb = svgEl.viewBox ? svgEl.viewBox.baseVal : null;
             if (vb && vb.width > 0 && vb.height > 0) {
                 State.svgNativeW = vb.width; State.svgNativeH = vb.height;
@@ -1614,7 +1728,6 @@
             D.hiddenSvgDom.appendChild(svgEl);
             State.currentSvgElement = svgEl;
 
-            // Agrupa por cor (Fill / Stroke)
             const colorGroups = {};
             paths.forEach((path) => {
                 const computed = window.getComputedStyle(path);
@@ -1623,7 +1736,6 @@
                 if (!color || color === 'none' || color === 'rgba(0, 0, 0, 0)') { color = path.getAttribute('stroke') || computed.stroke; }
                 if (!color || color === 'none' || color === 'rgba(0, 0, 0, 0)') color = "#000000";
                 
-                // Normaliza rgb para hex
                 if (color.startsWith('rgb')) {
                     const m = color.match(/\d+/g);
                     if(m && m.length >= 3) {
@@ -1645,7 +1757,7 @@
                 visible: true,
                 drawMode: State.globalDrawMode,
                 duration: 0
-            })).sort((a, b) => b.paths.length - a.paths.length); // Ordena pela quantidade de paths
+            })).sort((a, b) => b.paths.length - a.paths.length); 
 
             State.selectedLayerIdsForMerge.clear();
             
@@ -1655,7 +1767,6 @@
             D.workPanel.classList.remove('hidden');
             D.layersPanel.classList.remove('hidden');
             
-            // Scrolla suavemente para baixo em telas menores
             if(window.innerWidth < 1024) D.workPanel.scrollIntoView({behavior: "smooth"});
         }
 
@@ -1713,7 +1824,6 @@
             State.screenW = parseInt(D.screenW.value) || 1080;
             State.screenH = parseInt(D.screenH.value) || 1920;
             
-            // Atualiza Studio Vetorial
             D.canvas.width = State.screenW; 
             D.canvas.height = State.screenH;
             D.canvas.style.aspectRatio = `${State.screenW} / ${State.screenH}`;
@@ -1732,7 +1842,6 @@
             requestAnimationFrame(drawCanvasPreview);
         });
 
-        // Pan/Drag do Canvas
         function startDragCanvas(x, y) {
             State.isDraggingCanvas = true; State.startX = x; State.startY = y;
             State.initialOffsetX = State.svgOffsetX; State.initialOffsetY = State.svgOffsetY;
@@ -1785,7 +1894,6 @@
             });
             ctx.restore();
         }
-
         
         function checkMergeState() {
             if (State.selectedLayerIdsForMerge.size >= 2) {
@@ -1837,7 +1945,6 @@
                     </div>
                 `;
 
-                // Eventos
                 li.querySelector('.layer-chk').addEventListener('change', (e) => {
                     if (e.target.checked) State.selectedLayerIdsForMerge.add(layer.id);
                     else State.selectedLayerIdsForMerge.delete(layer.id);
@@ -1873,7 +1980,6 @@
                     downloadSingleLayer(i);
                 });
 
-                // Drag n Drop reordering
                 li.addEventListener('dragstart', function(e) { State.draggedItemIndex = i; e.dataTransfer.effectAllowed='move'; setTimeout(()=>this.classList.add('dragging'),0); });
                 li.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect='move'; });
                 li.addEventListener('dragenter', function(e) { e.preventDefault(); if(this.dataset.index!=State.draggedItemIndex) this.classList.add('drag-over'); });
@@ -1938,14 +2044,11 @@
             showToast(`Mesclado com sucesso na camada ${target.colorName}`);
         }
 
-
-        
         async function buildScriptString(layer, order, resolution) {
             let traces = [];
             const doFill = (layer.drawMode === 'hachura' || layer.drawMode === 'completo');
             const doStroke = (layer.drawMode === 'contorno' || layer.drawMode === 'completo');
             
-            // Hachura (Matemática Otimizada com Step e Intersection)
             if (doFill) {
                 const offCanvas = document.createElement('canvas');
                 offCanvas.width = Math.round(State.svgNativeW); offCanvas.height = Math.round(State.svgNativeH);
@@ -1998,7 +2101,6 @@
                 }
             }
 
-            // Contorno (Linha Interpolada)
             if (doStroke) {
                 const stepLen = Math.max(1, resolution / 2.0);
                 for (let j = 0; j < layer.paths.length; j++) {
@@ -2026,7 +2128,6 @@
 
             let playSound = D.notifyAutojs.checked;
 
-            // Template Script (Auto.js) seguindo a estrutura EXATA do arquivo de referência "Folhas verdes.js"
             let s = `// --- AUTO.JS VECTOR STUDIO ---\n// Engine de Múltiplos Arquivos | Modo: Precisão\n// Continuidade de Traço Ativa: Sem quebras em segmentos!\n\n`;
             
             s += `setScreenMetrics(${State.screenW}, ${State.screenH});\n\n`;
@@ -2054,7 +2155,6 @@
             s += `  { nome: "Pré-Traço Inicial (Anti-Bug)", isWarmup: true, del: 0, trs: [\n`;
             s += `    [\n      [527,960], [527,961], [527,962], [527,963], [528,963], [528,964], [528,965], [528,966], [528,967], [529,967], [529,968], [529,969], [529,970], [529,971], [529,972]\n    ]\n  ] },\n`;
             
-            // Quebra as coordenadas a cada 10 posições para ficar idêntico ao seu JS de referência
             let tracesStr = traces.map(tr => {
                 let formattedLine = '';
                 for(let i = 0; i < tr.length; i += 10) {
